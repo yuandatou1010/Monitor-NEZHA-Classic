@@ -526,3 +526,133 @@ button {
     grid-template-columns: var(--card-width);
   }
 }
+
+/* ===== 后台可自定义布局配置 ===== */
+:root {
+  /*
+   * 后台未来可以覆盖这些变量。
+   *
+   * 例如：
+   * --cards-per-row: 5;
+   * --card-width: 300px;
+   * --card-height: 360px;
+   */
+
+  /* 默认桌面端每排 6 个卡片 */
+  --cards-per-row: 6;
+
+  /* 单张卡片尺寸 */
+  --card-width: 278px;
+  --card-height: 333px;
+
+  /* 卡片之间的间距，原来约为 27px / 23px，现扩大一倍 */
+  --card-column-gap: 27px;
+  --card-row-gap: 23px;
+
+  /* 卡片与最大外框之间的距离，原来约 24px，现扩大一倍 */
+  --group-padding-x: 48px;
+  --group-padding-y: 26px;
+
+  /*
+   * 6 张 278px 卡片，加上 5 组横向间距和左右内边距后，
+   * 最大外框需要大于约 2034px。
+   */
+  --outer-max-width: 2100px;
+}
+
+/* 最大外框居中 */
+#app {
+  width: min(100%, var(--outer-max-width));
+  margin: 0 auto;
+}
+
+/* 分组最大外框 */
+.group {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto 28px;
+  padding: var(--group-padding-y) var(--group-padding-x);
+}
+
+/* 默认每排 6 张卡片 */
+.server-grid {
+  grid-template-columns: repeat(
+    var(--cards-per-row),
+    var(--card-width)
+  );
+  gap: var(--card-row-gap) var(--card-column-gap);
+  justify-content: center;
+}
+
+/* 卡片尺寸改为可配置 */
+.card {
+  width: var(--card-width);
+  min-width: var(--card-width);
+  height: var(--card-height);
+}
+
+/*
+ * CPU、内存、交换、硬盘字体与网速、流量一致。
+ * 原来的 Classic 样式使用 11px，这里统一为 12px。
+ */
+.metric-label {
+  color: #555 !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+}
+
+/* 网速、流量图标 */
+.icon-down {
+  color: #1597e5;
+}
+
+.icon-up {
+  color: #22a447;
+}
+
+/* 负载图标 */
+.icon-load {
+  color: var(--danger);
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* 响应式：桌面默认 6 个，窄屏自动减少卡片数量 */
+@media (max-width: 2000px) {
+  :root {
+    --cards-per-row: 5;
+  }
+}
+
+@media (max-width: 1650px) {
+  :root {
+    --cards-per-row: 4;
+  }
+}
+
+@media (max-width: 1360px) {
+  :root {
+    --cards-per-row: 3;
+  }
+}
+
+@media (max-width: 980px) {
+  :root {
+    --cards-per-row: 2;
+    --group-padding-x: 24px;
+    --card-column-gap: 28px;
+  }
+}
+
+@media (max-width: 620px) {
+  :root {
+    --cards-per-row: 1;
+    --card-width: min(100%, 278px);
+    --group-padding-x: 16px;
+  }
+
+  .server-grid {
+    grid-template-columns: var(--card-width);
+  }
+}
+
