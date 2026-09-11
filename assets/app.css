@@ -495,7 +495,7 @@ body{background:#fff;}
    * 6 张 278px 卡片，加上 5 组横向间距和左右内边距后，
    * 最大外框需要大于约 2034px。
    */
-  --outer-max-width: 2100px;
+  --outer-max-width: 2033px;
 }
 
 /* 最大外框居中 */
