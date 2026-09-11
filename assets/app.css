@@ -500,7 +500,7 @@ body{background:#fff;}
 
 /* 最大外框居中 */
 #app {
-  width: min(100%, var(--outer-max-width));
+  width: min(95%, var(--outer-max-width));
   margin: 0 auto;
 }
 
