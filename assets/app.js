@@ -12,11 +12,17 @@
 
   // /api/servers 返回 servers[].region（通常为 ISO 两字母区域代码）。
   // 不维护英文地区名称，直接把 API 的区域代码转换成 Unicode 国旗。
-  function regionFlag(code) {
-    const c = String(code || "").trim().toUpperCase();
-    if (!/^[A-Z]{2}$/.test(c)) return "🌐";
-    return String.fromCodePoint(...[...c].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65));
-  }
+  function regionFlag(region) {
+  const code = String(region || "").trim().toLowerCase();
+  if (!/^[a-z]{2}$/.test(code)) return "";
+  return `<img class="server-flag" src="/flags/${code}.svg" alt="" onerror="this.replaceWith(document.createTextNode(flagFallback('${code}')))" />`;
+}
+
+function flagFallback(code) {
+  return code.length === 2
+    ? String.fromCodePoint(...[...code].map(c => 127397 + c.charCodeAt(0)))
+    : "";
+}
 
   function esc(value) {
     return String(value ?? "")
