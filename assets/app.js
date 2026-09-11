@@ -1,581 +1,453 @@
+/* app.js */
+
 (() => {
   "use strict";
 
   const state = {
-    config: {},
     servers: [],
-    serverMap: new Map(),
     ws: null,
     reconnectTimer: null,
-    demo: new URLSearchParams(location.search).get("demo") === "1"
+
+    /*
+     * 地址栏增加 ?demo=1 可以显示演示数据：
+     * https://your-domain.com/?demo=1
+     */
+    demo: new URLSearchParams(location.search).get("demo") === "1",
   };
 
-  function esc(value) {
+  const $ = (selector, root = document) => {
+    return root.querySelector(selector);
+  };
+
+  const escapeHtml = (value) => {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
+      .replace(/'/g, "&#039;");
+  };
 
-  function num(value, fallback = 0) {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : fallback;
-  }
+  const toNumber = (value, fallback = 0) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  };
 
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
+  const clamp = (value, min = 0, max = 100) => {
+    return Math.max(min, Math.min(max, toNumber(value)));
+  };
 
-  function regionFlag(region) {
+  const formatPercent = (value) => {
+    return `${clamp(value).toFixed(0)}%`;
+  };
+
+  const formatBytes = (value) => {
+    let number = toNumber(value);
+    const units = ["B", "KB", "MB", "GB", "TB"];
+
+    let unitIndex = 0;
+
+    while (
+      Math.abs(number) >= 1024 &&
+      unitIndex < units.length - 1
+    ) {
+      number /= 1024;
+      unitIndex += 1;
+    }
+
+    return `${number.toFixed(unitIndex ? 2 : 0)} ${units[unitIndex]}`;
+  };
+
+  const formatSpeed = (value) => {
+    return `${formatBytes(value)}/s`;
+  };
+
+  const formatCapacity = (value) => {
+    /*
+     * 当前兼容 ram_total / disk_total 以 MB 为单位的数据结构。
+     */
+    return formatBytes(toNumber(value) * 1024 * 1024);
+  };
+
+  const formatLoad = (value) => {
+    if (Array.isArray(value)) {
+      return value
+        .slice(0, 3)
+        .map((item) => toNumber(item).toFixed(2))
+        .join(" ");
+    }
+
+    if (value === null || value === undefined || value === "") {
+      return "0.00 0.00 0.00";
+    }
+
+    return String(value);
+  };
+
+  const formatDate = (value) => {
+    if (!value) {
+      return "-";
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+
+    return date.toLocaleString("zh-CN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getUptime = (bootTime) => {
+    if (!bootTime) {
+      return "-";
+    }
+
+    const start = new Date(bootTime).getTime();
+
+    if (!Number.isFinite(start)) {
+      return "-";
+    }
+
+    const difference = Math.max(0, Date.now() - start);
+    const totalHours = Math.floor(difference / 3600000);
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+
+    if (days > 0) {
+      return `${days}天 ${hours}小时`;
+    }
+
+    return `${hours}小时`;
+  };
+
+  const getFlagHtml = (region) => {
     const code = String(region || "").trim().toLowerCase();
 
     if (!/^[a-z]{2}$/.test(code)) {
       return "";
     }
 
-    return `<img class="server-flag" src="/flags/${esc(code)}.svg" alt="" onerror="this.replaceWith(document.createTextNode(flagFallback('${esc(code)}')))" />`;
-  }
+    const safeCode = escapeHtml(code);
 
-  function flagFallback(code) {
-    return code.length === 2
-      ? String.fromCodePoint(...[...code].map(char => 127397 + char.charCodeAt(0)))
-      : "";
-  }
+    return `
+      <img
+        class="server-flag"
+        src="/flags/${safeCode}.svg"
+        alt=""
+        onerror="this.style.display='none'"
+      >
+    `;
+  };
 
-  function bytes(value) {
-    let n = Math.max(0, num(value));
-    const units = ["B", "K", "M", "G", "T", "P"];
-    let index = 0;
+  const getMemoryPercent = (server) => {
+    const total = toNumber(server.ram_total);
 
-    while (n >= 1024 && index < units.length - 1) {
-      n /= 1024;
-      index++;
+    if (total <= 0) {
+      return 0;
     }
 
-    if (index === 0) {
-      return `${Math.round(n)}B`;
+    return toNumber(server.ram_used) / total * 100;
+  };
+
+  const getSwapPercent = (server) => {
+    const total = toNumber(server.swap_total);
+
+    if (total <= 0) {
+      return 0;
     }
 
-    return `${n >= 100 ? n.toFixed(0) : n.toFixed(2)}${units[index]}`;
-  }
+    return toNumber(server.swap_used) / total * 100;
+  };
 
-  function speed(value) {
-    return `${bytes(value)}/s`;
-  }
+  const getDiskPercent = (server) => {
+    const total = toNumber(server.disk_total);
 
-  function capacity(value) {
-    const n = Math.max(0, num(value));
-
-    if (n >= 1024 * 1024) {
-      return `${(n / 1024 / 1024).toFixed(1)}TB`;
+    if (total <= 0) {
+      return 0;
     }
 
-    if (n >= 1024) {
-      return `${(n / 1024).toFixed(n >= 10240 ? 0 : 1)}GB`;
-    }
+    return toNumber(server.disk_used) / total * 100;
+  };
 
-    return `${Math.round(n)}MB`;
-  }
+  const isOffline = (server) => {
+    return (
+      server.online === false ||
+      server.status === "offline" ||
+      server.status === 0
+    );
+  };
 
-  function percent(used, total) {
-    const totalValue = num(total);
-    return totalValue > 0 ? clamp(num(used) / totalValue * 100, 0, 100) : 0;
-  }
-
-  function fmtPct(value) {
-    const n = num(value);
-    return `${n >= 10 ? n.toFixed(0) : n.toFixed(1).replace(/\.0$/, "")}%`;
-  }
-
-  function fmtLoad(value) {
-    if (Array.isArray(value)) {
-      return value.slice(0, 3).map(item => num(item).toFixed(2)).join(" | ");
-    }
-
-    const source = String(value ?? "0 0 0").trim().replace(/\s+/g, " ");
-
-    if (!source) {
-      return "0.00 | 0.00 | 0.00";
-    }
-
-    return source.split(/[ ,|]+/).slice(0, 3).map(item => {
-      const n = Number(item);
-      return Number.isFinite(n) ? n.toFixed(2) : item;
-    }).join(" | ");
-  }
-
-  function uptime(boot) {
-    const bootTime = num(boot);
-
-    if (!bootTime) {
-      return "0:00:00";
-    }
-
-    const seconds = Math.max(0, Math.floor((Date.now() - bootTime) / 1000));
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (days > 0) {
-      return `${days} 天`;
-    }
-
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-  }
-
-  function online(server) {
-    if (typeof server.is_online === "boolean") {
-      return server.is_online;
-    }
-
-    const lastUpdated = num(server.last_updated);
-    return lastUpdated > 0 && Date.now() - lastUpdated <= 300000;
-  }
-
-  function regionCode(server) {
-    return String(server.region || server.country || server.server_group || "UN")
-      .toUpperCase()
-      .slice(0, 2);
-  }
-
-  function flag(server) {
-    return regionFlag(server.region || regionCode(server));
-  }
-
-  function osIcon(server) {
-    const os = String(server.os || "").toLowerCase();
-
-    if (os.includes("windows")) {
-      return "▣";
-    }
-
-    if (
-      os.includes("ubuntu") ||
-      os.includes("debian") ||
-      os.includes("linux") ||
-      os.includes("alpine") ||
-      os.includes("centos") ||
-      os.includes("openwrt")
-    ) {
-      return "◉";
-    }
-
-    if (os.includes("mac") || os.includes("darwin")) {
-      return "◌";
-    }
-
-    return "◉";
-  }
-
-  function groupName(server) {
-    const group = String(server.server_group || "").trim();
-    return group || "other";
-  }
-
-  function progress(label, value, offline) {
-    const percentage = clamp(num(value), 0, 100);
+  const progress = (
+    label,
+    value,
+    type = "",
+    offline = false
+  ) => {
+    const percent = clamp(value);
 
     return `
       <div class="metric">
-        <span class="metric-label">${esc(label)}</span>
+        <span class="metric-label">${label}</span>
+
         <div class="bar">
-          <div class="bar-fill ${offline ? "offline" : ""}" style="width:${percentage}%"></div>
-          <span class="bar-value">${fmtPct(percentage)}</span>
+          <div
+            class="bar-fill ${type} ${offline ? "offline" : ""}"
+            style="width: ${percent}%"
+          ></div>
+
+          <span class="bar-value">
+            ${formatPercent(percent)}
+          </span>
         </div>
       </div>
     `;
-  }
+  };
 
-  function card(server) {
-    const offline = !online(server);
-    const ramPct = percent(server.ram_used, server.ram_total);
-    const swapPct = percent(server.swap_used, server.swap_total);
-    const diskPct = percent(server.disk_used, server.disk_total);
+  const getServerName = (server) => {
+    return (
+      server.name ||
+      server.hostname ||
+      server.server_name ||
+      server.id ||
+      "未命名服务器"
+    );
+  };
+
+  const serverCard = (server) => {
+    const offline = isOffline(server);
+    const serverName = getServerName(server);
+
+    const memoryPercent = getMemoryPercent(server);
+    const swapPercent = getSwapPercent(server);
+    const diskPercent = getDiskPercent(server);
 
     return `
-      <article class="card" data-id="${esc(server.id)}">
-        <header class="card-head">
-          <span class="flag">${flag(server)}</span>
-          <span class="os">${esc(osIcon(server))}</span>
-          <span class="name" title="${esc(server.name || "Unnamed")}">
-            ${esc(server.name || "Unnamed")}${offline ? "[已离线]" : ""}
+      <article class="server-card">
+        <div class="server-head">
+          <span class="status-dot ${offline ? "offline" : ""}"></span>
+
+          ${getFlagHtml(server.region)}
+
+          <span
+            class="server-name"
+            title="${escapeHtml(serverName)}"
+          >
+            ${escapeHtml(serverName)}
           </span>
-          <button class="info" type="button" data-info="${esc(server.id)}" aria-label="服务器信息">i</button>
-        </header>
+        </div>
 
-        <div class="metrics">
-          ${progress("CPU", server.cpu, offline)}
-          ${progress("内存", ramPct, offline)}
-          ${progress("交换", swapPct, offline)}
-          ${progress("硬盘", diskPct, offline)}
+        ${progress("CPU", server.cpu, "cpu", offline)}
 
-          <div class="text-row">
-            <span class="text-label">网速</span>
-            <span class="text-value">
-              <span class="icon-down">↓</span>${esc(speed(server.net_in_speed))}
-              <span class="icon-up">↑</span>${esc(speed(server.net_out_speed))}
-            </span>
-          </div>
+        ${progress(
+          "内存",
+          memoryPercent,
+          "memory",
+          offline
+        )}
 
-          <div class="text-row">
-            <span class="text-label">流量</span>
-            <span class="text-value">
-              <span class="icon-down">⇣</span>${esc(bytes(server.net_rx))}
-              <span class="icon-up">⇡</span>${esc(bytes(server.net_tx))}
-            </span>
-          </div>
+        ${progress(
+          "交换",
+          swapPercent,
+          "swap",
+          offline
+        )}
 
-          <div class="text-row">
-            <span class="text-label">信息</span>
-            <span class="text-value">
-              <span class="icon-cpu">⚙</span>${esc(num(server.cpu_cores))} Cores
-              <span class="icon-ram">▤</span>${esc(capacity(server.ram_total))}
-              <span class="icon-disk">▱</span>${esc(capacity(server.disk_total))}
-            </span>
-          </div>
+        ${progress(
+          "硬盘",
+          diskPercent,
+          "disk",
+          offline
+        )}
 
-          <div class="text-row">
-            <span class="text-label">负载</span>
-            <span class="text-value">
-              <span class="icon-load">≋</span>${esc(fmtLoad(server.load_avg))}
-            </span>
-          </div>
+        <div class="text-row">
+          <span class="text-label">网速</span>
 
-          <div class="text-row">
-            <span class="text-label">在线</span>
-            <span class="text-value">
-              <span class="status-dot ${offline ? "offline" : ""}"></span>
-              ${esc(uptime(server.boot_time))}
-            </span>
-          </div>
+          <span class="text-value">
+            <span class="icon-down">⬇</span>
+            ${escapeHtml(formatSpeed(server.net_in_speed))}
+
+            <span class="icon-up">⬆</span>
+            ${escapeHtml(formatSpeed(server.net_out_speed))}
+          </span>
+        </div>
+
+        <div class="text-row">
+          <span class="text-label">流量</span>
+
+          <span class="text-value">
+            <span class="icon-down">⬇</span>
+            ${escapeHtml(formatBytes(server.net_rx))}
+
+            <span class="icon-up">⬆</span>
+            ${escapeHtml(formatBytes(server.net_tx))}
+          </span>
+        </div>
+
+        <div class="text-row">
+          <span class="text-label">信息</span>
+
+          <span class="text-value">
+            <span class="icon-cpu">⚙</span>
+            ${escapeHtml(String(toNumber(server.cpu_cores)))} Cores
+
+            <span class="sep">|</span>
+
+            <span class="icon-ram">▤</span>
+            ${escapeHtml(formatCapacity(server.ram_total))}
+
+            <span class="sep">|</span>
+
+            <span class="icon-disk">▱</span>
+            ${escapeHtml(formatCapacity(server.disk_total))}
+          </span>
+        </div>
+
+        <div class="text-row">
+          <span class="text-label">负载</span>
+
+          <span class="text-value">
+            <span class="icon-load">〽</span>
+            ${escapeHtml(formatLoad(server.load_avg))}
+          </span>
         </div>
       </article>
     `;
-  }
+  };
 
-  function groupedServers() {
-    const groups = new Map();
-
-    for (const server of state.servers) {
-      const group = groupName(server);
-
-      if (!groups.has(group)) {
-        groups.set(group, []);
-      }
-
-      groups.get(group).push(server);
+  const normalizeServers = (data) => {
+    if (Array.isArray(data)) {
+      return data;
     }
 
-    return groups;
-  }
+    if (data && Array.isArray(data.servers)) {
+      return data.servers;
+    }
 
-  function render() {
-    const app = document.querySelector("#app");
+    if (data && Array.isArray(data.data)) {
+      return data.data;
+    }
+
+    return [];
+  };
+
+  const render = (servers = state.servers) => {
+    const app = $("#app");
 
     if (!app) {
       return;
     }
 
-    if (!state.servers.length) {
-      app.innerHTML = `<div class="error">暂无可显示的服务器</div>`;
+    if (!Array.isArray(servers) || servers.length === 0) {
+      app.innerHTML = `
+        <div class="loading">
+          暂无服务器数据
+        </div>
+      `;
+
       return;
     }
 
-    const groups = groupedServers();
+    const groups = new Map();
 
-    app.innerHTML = Array.from(groups.entries()).map(([name, servers]) => `
-      <section class="group" data-group="${esc(name)}">
-        <h2 class="group-title" data-collapse="${esc(name)}">
-          <span class="group-arrow">▼</span>
-          <span>${esc(name)}</span>
-        </h2>
-        <div class="server-grid">
-          ${servers.map(card).join("")}
-        </div>
-      </section>
-    `).join("");
+    servers.forEach((server) => {
+      const groupName =
+        server.server_group ||
+        server.group ||
+        server.group_name ||
+        "其他";
 
-    bindEvents();
-  }
+      if (!groups.has(groupName)) {
+        groups.set(groupName, []);
+      }
 
-  function bindEvents() {
-    document.querySelectorAll("[data-collapse]").forEach(element => {
-      element.addEventListener("click", () => {
-        const group = element.closest(".group");
+      groups.get(groupName).push(server);
+    });
+
+    const groupHtml = [...groups.entries()]
+      .map(([groupName, groupServers]) => {
+        return `
+          <section class="group">
+            <h2 class="group-title">
+              ${escapeHtml(groupName)}
+              <small>(${groupServers.length})</small>
+            </h2>
+
+            <div class="server-grid">
+              ${groupServers.map(serverCard).join("")}
+            </div>
+          </section>
+        `;
+      })
+      .join("");
+
+    app.innerHTML = `
+      <main class="dashboard">
+        ${groupHtml}
+      </main>
+    `;
+
+    document.querySelectorAll(".group-title").forEach((title) => {
+      title.addEventListener("click", () => {
+        const group = title.closest(".group");
+
         if (group) {
           group.classList.toggle("collapsed");
         }
       });
     });
+  };
 
-    document.querySelectorAll("[data-info]").forEach(button => {
-      button.addEventListener("click", () => {
-        const server = state.serverMap.get(String(button.dataset.info));
-        if (server) {
-          showInfo(server, button);
-        }
-      });
-    });
-  }
-
-  function formatStartTime(timestamp) {
-    const value = num(timestamp);
-
-    if (!value) {
-      return "—";
-    }
-
-    const date = new Date(value);
-    const pad = number => String(number).padStart(2, "0");
-
-    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-  }
-
-  function showInfo(server, sourceButton) {
-    let modalMask = document.querySelector(".modal-mask");
-
-    if (!modalMask) {
-      modalMask = document.createElement("div");
-      modalMask.className = "modal-mask";
-      modalMask.innerHTML = `
-        <div class="modal" role="dialog" aria-modal="true">
-          <div class="modal-title"></div>
-          <div class="modal-grid"></div>
-          <button class="modal-close" type="button" aria-label="关闭">×</button>
-        </div>
-      `;
-
-      document.body.appendChild(modalMask);
-
-      modalMask.addEventListener("click", event => {
-        if (event.target === modalMask || event.target.classList.contains("modal-close")) {
-          modalMask.classList.remove("show");
-        }
-      });
-    }
-
-    const title = modalMask.querySelector(".modal-title");
-    const grid = modalMask.querySelector(".modal-grid");
-    const swapTotal = num(server.swap_total);
-    const swapText = swapTotal > 0
-      ? `${capacity(server.swap_used)}/${capacity(swapTotal)}`
-      : "OFF";
-
-    title.textContent = `${server.name || "Server"} 信息`;
-
-    const rows = [
-      ["系统", `${server.os || "—"} [${server.arch || "—"}]`],
-      ["CPU", server.cpu_info || `${num(server.cpu_cores)} Core`],
-      ["硬盘", `${capacity(server.disk_used)}/${capacity(server.disk_total)}`],
-      ["内存", `${capacity(server.ram_used)}/${capacity(server.ram_total)}`],
-      ["交换", swapText],
-      ["流量", `↓ ${bytes(server.net_rx)} ↑ ${bytes(server.net_tx)}`],
-      ["负载", fmtLoad(server.load_avg)],
-      ["进程数", num(server.processes)],
-      ["连接数", `TCP ${num(server.tcp_conn)} / UDP ${num(server.udp_conn)}`],
-      ["启动", formatStartTime(server.boot_time)]
-    ];
-
-    grid.innerHTML = rows
-      .map(([label, value]) => `<span>${esc(label)}: ${esc(value)}</span>`)
-      .join("");
-
-    const source = sourceButton || document.querySelector(
-      `[data-info="${CSS.escape(String(server.id))}"]`
-    );
-
-    if (source) {
-      const rect = source.getBoundingClientRect();
-      const modalWidth = 330;
-      let left = rect.right - modalWidth;
-      let top = rect.bottom + 7;
-
-      left = Math.max(10, Math.min(left, window.innerWidth - modalWidth - 10));
-
-      if (top + 330 > window.innerHeight) {
-        top = Math.max(10, rect.top - 340);
-      }
-
-      const modal = modalMask.querySelector(".modal");
-      modal.style.left = `${left}px`;
-      modal.style.top = `${top}px`;
-    }
-
-    modalMask.classList.add("show");
-  }
-
-  function mergeServer(id, data) {
-    const key = String(id);
-    const current = state.serverMap.get(key);
-
-    if (!current) {
-      return;
-    }
-
-    state.serverMap.set(key, Object.assign({}, current, data, { id }));
-  }
-
-  async function load() {
-    if (state.demo) {
-      state.config = {
-        site_title: "NEZHA Classic",
-        is_public: true
-      };
-
-      state.servers = demoData();
-      state.serverMap = new Map(
-        state.servers.map(server => [String(server.id), server])
-      );
-
-      render();
-      return;
-    }
-
-    try {
-      const configResponse = await fetch("/api/config", {
-        credentials: "same-origin"
-      });
-
-      if (configResponse.ok) {
-        state.config = await configResponse.json();
-      }
-
-      const serverResponse = await fetch("/api/servers", {
-        credentials: "same-origin"
-      });
-
-      if (!serverResponse.ok) {
-        throw new Error(`API /api/servers ${serverResponse.status}`);
-      }
-
-      const data = await serverResponse.json();
-      state.servers = Array.isArray(data.servers) ? data.servers : [];
-      state.serverMap = new Map(
-        state.servers.map(server => [String(server.id), server])
-      );
-
-      render();
-      connectWS();
-    } catch (error) {
-      console.error(error);
-
-      const app = document.querySelector("#app");
-
-      if (app) {
-        app.innerHTML = `
-          <div class="error">
-            无法读取服务器数据：${esc(error.message)}
-            <br>
-            <small>
-              如果启用了 Turnstile，请使用项目内置的验证流程；
-              如果站点为私有站点，请先登录。
-            </small>
-          </div>
-        `;
-      }
-    }
-  }
-
-  function connectWS() {
-    if (state.ws) {
-      try {
-        state.ws.close();
-      } catch (_) {}
-    }
-
-    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    const url = new URL(`${protocol}//${location.host}/api/ws`);
-    url.searchParams.set("subscribe", "all");
-
-    const token = localStorage.getItem("jwt_token");
-
-    if (token && state.config.is_public !== true && state.config.is_public !== "true") {
-      url.searchParams.set("token", token);
-    }
-
-    const websocket = new WebSocket(url.toString());
-    state.ws = websocket;
-
-    websocket.onopen = () => {
-      const ids = state.servers.map(server => server.id).filter(Boolean);
-
-      try {
-        websocket.send(JSON.stringify({
-          type: "subscribe",
-          scope: "all",
-          ids
-        }));
-      } catch (_) {}
-    };
-
-    websocket.onmessage = event => {
-      try {
-        const message = JSON.parse(event.data);
-
-        if (message.type !== "batchUpdate") {
-          return;
-        }
-
-        for (const update of message.updates || []) {
-          for (const sample of update.samples || []) {
-            if (sample && sample.data) {
-              mergeServer(update.serverId, sample.data);
-            }
-          }
-        }
-
-        state.servers = state.servers.map(server => {
-          return state.serverMap.get(String(server.id)) || server;
-        });
-
-        render();
-      } catch (error) {
-        console.warn("WS message error", error);
-      }
-    };
-
-    websocket.onclose = () => {
-      clearTimeout(state.reconnectTimer);
-      state.reconnectTimer = setTimeout(connectWS, 5000);
-    };
-
-    websocket.onerror = () => {
-      try {
-        websocket.close();
-      } catch (_) {}
-    };
-  }
-
-  function demoData() {
+  const demoData = () => {
     const now = Date.now();
 
-    function makeServer(id, name, region, cpu, ram, disk, days) {
+    const makeServer = (
+      id,
+      name,
+      region,
+      cpu,
+      ram,
+      disk,
+      days
+    ) => {
       return {
         id,
         name,
         region,
-        server_group: "other",
+        server_group: "其他",
+
+        online: true,
+
         cpu,
+
         ram_total: 1024,
         ram_used: 1024 * ram / 100,
-        swap_total: 0,
+
+        swap_total: 1024,
         swap_used: 0,
+
         disk_total: 40960,
         disk_used: 40960 * disk / 100,
+
         net_in_speed: 3580,
         net_out_speed: 3670,
-        net_rx: 440.51 * 1024 * 2,
-        net_tx: 432.88 * 1024 * 2,
+
+        net_rx: 440.51 * 1024 ** 2,
+        net_tx: 432.88 * 1024 ** 2,
+
         cpu_cores: 2,
         load_avg: "0.03 0.01 0.00",
+
         boot_time: now - days * 86400000,
         last_updated: now,
-        is_online: true
       };
-    }
+    };
 
     return [
       makeServer("1", "香港-0", "HK", 0, 14, 17, 0.27),
@@ -585,11 +457,124 @@
       makeServer("5", "美国", "US", 7, 67, 16, 312),
       makeServer("6", "香港-A", "HK", 2, 29, 47, 55),
       makeServer("7", "香港-B", "HK", 0, 26, 40, 55),
-      makeServer("8", "台湾-A", "TW", 3, 21, 29, 404),
-      makeServer("9", "台湾-B", "TW", 0, 23, 29, 18),
-      makeServer("10", "新加坡", "SG", 3, 78, 58, 118)
     ];
-  }
+  };
 
-  load();
+  const loadServers = async () => {
+    if (state.demo) {
+      state.servers = demoData();
+      render();
+      return;
+    }
+
+    const app = $("#app");
+
+    if (app) {
+      app.innerHTML = `
+        <div class="loading">
+          正在加载服务器数据……
+        </div>
+      `;
+    }
+
+    try {
+      const response = await fetch("/api/servers", {
+        method: "GET",
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      state.servers = normalizeServers(data);
+      render();
+    } catch (error) {
+      console.error("服务器数据加载失败：", error);
+
+      if (app) {
+        app.innerHTML = `
+          <div class="error">
+            服务器数据加载失败：
+            ${escapeHtml(error.message)}
+          </div>
+        `;
+      }
+    }
+  };
+
+  const connectWebSocket = () => {
+    if (state.demo || !window.WebSocket) {
+      return;
+    }
+
+    const protocol =
+      location.protocol === "https:" ? "wss:" : "ws:";
+
+    const wsUrl = `${protocol}//${location.host}/ws`;
+
+    try {
+      const ws = new WebSocket(wsUrl);
+
+      state.ws = ws;
+
+      ws.onopen = () => {
+        console.log("WebSocket 已连接");
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          const servers = normalizeServers(data);
+
+          if (Array.isArray(servers) && servers.length > 0) {
+            state.servers = servers;
+            render();
+          }
+        } catch (error) {
+          console.warn("WebSocket 数据解析失败：", error);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.warn("WebSocket 连接错误：", error);
+
+        try {
+          ws.close();
+        } catch (_) {
+          // 忽略关闭错误
+        }
+      };
+
+      ws.onclose = () => {
+        console.warn("WebSocket 已断开，5 秒后重连");
+
+        clearTimeout(state.reconnectTimer);
+
+        state.reconnectTimer = setTimeout(() => {
+          connectWebSocket();
+        }, 5000);
+      };
+    } catch (error) {
+      console.warn("WebSocket 初始化失败：", error);
+
+      clearTimeout(state.reconnectTimer);
+
+      state.reconnectTimer = setTimeout(() => {
+        connectWebSocket();
+      }, 5000);
+    }
+  };
+
+  const init = async () => {
+    await loadServers();
+    connectWebSocket();
+  };
+
+  init();
 })();
