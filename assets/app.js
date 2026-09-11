@@ -10,14 +10,13 @@
     demo: new URLSearchParams(location.search).get("demo") === "1"
   };
 
-  const FLAGS = {
-    HK: "🇭🇰", TW: "🇹🇼", JP: "🇯🇵", KR: "🇰🇷", SG: "🇸🇬",
-    US: "🇺🇸", CN: "🇨🇳", GB: "🇬🇧", DE: "🇩🇪", NL: "🇳🇱",
-    FR: "🇫🇷", CA: "🇨🇦", AU: "🇦🇺", RU: "🇷🇺", IN: "🇮🇳",
-    MY: "🇲🇾", TH: "🇹🇭", VN: "🇻🇳", ID: "🇮🇩", PH: "🇵🇭",
-    TR: "🇹🇷", FI: "🇫🇮", SE: "🇸🇪", NO: "🇳🇴", CH: "🇨🇭",
-    IT: "🇮🇹", ES: "🇪🇸", BR: "🇧🇷"
-  };
+  // /api/servers 返回 servers[].region（通常为 ISO 两字母区域代码）。
+  // 不维护英文地区名称，直接把 API 的区域代码转换成 Unicode 国旗。
+  function regionFlag(code) {
+    const c = String(code || "").trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(c)) return "🌐";
+    return String.fromCodePoint(...[...c].map(ch => 0x1F1E6 + ch.charCodeAt(0) - 65));
+  }
 
   function esc(value) {
     return String(value ?? "")
@@ -93,6 +92,7 @@
   }
 
   function online(server) {
+    if (typeof server.is_online === "boolean") return server.is_online;
     const ts = num(server.last_updated);
     return ts > 0 && Date.now() - ts <= 300000;
   }
@@ -102,7 +102,7 @@
   }
 
   function flag(server) {
-    return FLAGS[regionCode(server)] || "🌐";
+    return regionFlag(server.region);
   }
 
   function osIcon(server) {
@@ -218,7 +218,7 @@
           <span class="group-arrow">▼</span>
           <span>${esc(name)}</span>
         </h2>
-        <div class="server-grid">${servers.map(card).join("")}</div>
+        <div class="server-grid" style="grid-template-columns:repeat(${Math.min(5, servers.length)}, 278px)">${servers.map(card).join("")}</div>
       </section>
     `).join("");
 
@@ -238,6 +238,14 @@
     });
   }
 
+  function formatStartTime(ts) {
+    const n = num(ts);
+    if (!n) return "—";
+    const d = new Date(n);
+    const pad = x => String(x).padStart(2, "0");
+    return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
   function showInfo(s) {
     let modal = document.querySelector(".modal-mask");
     if (!modal) {
@@ -247,7 +255,7 @@
         <div class="modal" role="dialog" aria-modal="true">
           <div class="modal-title"></div>
           <div class="modal-grid"></div>
-          <button class="modal-close" type="button">关闭</button>
+          <button class="modal-close" type="button">×</button>
         </div>`;
       document.body.appendChild(modal);
       modal.addEventListener("click", e => {
@@ -258,16 +266,31 @@
     const title = modal.querySelector(".modal-title");
     const grid = modal.querySelector(".modal-grid");
     title.textContent = `${s.name || "Server"} 信息`;
+    const swapTotal = num(s.swap_total);
+    const swapText = swapTotal > 0 ? `${capacity(s.swap_used)}/${capacity(swapTotal)}` : "OFF";
     grid.innerHTML = [
-      ["系统", s.os || "—"],
-      ["架构", s.arch || "—"],
-      ["IPv4", s.ip_v4 || "—"],
-      ["IPv6", s.ip_v6 || "—"],
-      ["CPU", `${num(s.cpu_cores)} Cores${s.cpu_info ? " · " + s.cpu_info : ""}`],
-      ["内存", `${capacity(s.ram_used)} / ${capacity(s.ram_total)}`],
-      ["磁盘", `${capacity(s.disk_used)} / ${capacity(s.disk_total)}`],
-      ["内核", s.kernel_version || "—"],
-    ].map(([k, v]) => `<b>${esc(k)}</b><span>${esc(v)}</span>`).join("");
+      ["系统", `${s.os || "—"} [${s.arch || "—"}]`],
+      ["CPU", s.cpu_info ? s.cpu_info : `${num(s.cpu_cores)} Core`],
+      ["硬盘", `${capacity(s.disk_used)}/${capacity(s.disk_total)}`],
+      ["内存", `${capacity(s.ram_used)}/${capacity(s.ram_total)}`],
+      ["交换", swapText],
+      ["流量", `⬇ ${bytes(s.net_rx)} ⬆ ${bytes(s.net_tx)}`],
+      ["负载", fmtLoad(s.load_avg)],
+      ["进程数", num(s.processes)],
+      ["连接数", `TCP ${num(s.tcp_conn)} / UDP ${num(s.udp_conn)}`],
+      ["启动", formatStartTime(s.boot_time)],
+    ].map(([k, v]) => `<span>${esc(k)}: ${esc(v)}</span>`).join("");
+    const btn = document.querySelector(`[data-info="${CSS.escape(String(s.id))}"]`);
+    if (btn) {
+      const r = btn.getBoundingClientRect();
+      const mw = 330;
+      let left = r.right - mw;
+      let top = r.bottom + 7;
+      left = Math.max(10, Math.min(left, window.innerWidth - mw - 10));
+      if (top + 330 > window.innerHeight) top = Math.max(10, r.top - 340);
+      modal.querySelector(".modal").style.left = `${left}px`;
+      modal.querySelector(".modal").style.top = `${top}px`;
+    }
     modal.classList.add("show");
   }
 
