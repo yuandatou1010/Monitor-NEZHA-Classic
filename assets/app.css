@@ -1,47 +1,26 @@
 :root {
-  /* ================================
-     后台可覆盖的布局参数
-     ================================ */
-
-  /* 每排默认 6 个卡片 */
+  /* 后台可以通过 <style> 覆盖以下变量 */
   --layout-columns: 6;
-
-  /* 卡片尺寸 */
   --card-width: 278px;
   --card-height: 333px;
-
-  /* 卡片之间的间距 */
   --card-gap-x: 54px;
   --card-gap-y: 46px;
-
-  /* 卡片与外框之间的间距 */
   --group-padding-x: 20px;
   --group-padding-y: 20px;
 
-  /* 页面颜色 */
   --page-bg: #fff;
   --group-border: #dcdcdc;
   --card-border: #e1e1e1;
   --line: #eeeeee;
-
   --text: #555;
   --title: #333;
-
-  --blue: #1597e5;
-  --blue-dark: #1188d2;
-
   --bar-bg: #eeeeee;
   --offline: #7d8c99;
   --danger: #ef4444;
   --green: #22a447;
   --disk: #ef3f3f;
-
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --data-font-size: 12px;
 }
-
-/* ================================
-   基础样式
-   ================================ */
 
 * {
   box-sizing: border-box;
@@ -53,12 +32,7 @@ body {
   min-height: 100%;
   background: var(--page-bg);
   color: #333;
-  font-family:
-    Arial,
-    "Microsoft YaHei",
-    "PingFang SC",
-    "Helvetica Neue",
-    sans-serif;
+  font-family: Arial, "Microsoft YaHei", "PingFang SC", "Helvetica Neue", sans-serif;
   font-size: 13px;
   font-weight: 400;
   letter-spacing: 0;
@@ -74,54 +48,35 @@ body {
   min-width: max-content;
 }
 
-/* ================================
-   分组最大外框
-   ================================ */
-
 .group {
   width: max-content;
   max-width: none;
-
   margin: 0 auto 18px;
-
-  padding:
-    var(--group-padding-y)
-    var(--group-padding-x)
-    24px;
-
+  padding: var(--group-padding-y) var(--group-padding-x) 24px;
   border: 1px solid var(--group-border);
   border-radius: 2px;
-
   background: #fff;
-  box-shadow: none;
 }
 
 .group-title {
   display: flex;
   align-items: center;
-
   height: 25px;
   margin: 0 0 15px 3px;
-
   gap: 8px;
-
   color: #555;
   font-size: 14px;
   font-weight: 400;
   line-height: 20px;
-
   cursor: pointer;
   user-select: none;
 }
 
 .group-arrow {
   display: inline-block;
-
   width: 12px;
-
   color: #111;
   font-size: 13px;
-
   transition: transform 0.15s ease;
 }
 
@@ -133,46 +88,26 @@ body {
   display: none;
 }
 
-/* ================================
-   卡片网格
-   ================================ */
-
 .server-grid {
   display: grid;
-
-  grid-template-columns:
-    repeat(var(--layout-columns), var(--card-width));
-
+  grid-template-columns: repeat(var(--layout-columns), var(--card-width));
   column-gap: var(--card-gap-x);
   row-gap: var(--card-gap-y);
-
   align-items: start;
 }
-
-/* ================================
-   服务器卡片
-   ================================ */
 
 .card {
   width: var(--card-width);
   min-width: var(--card-width);
   max-width: var(--card-width);
-
   height: var(--card-height);
-
   padding: 10px;
-
   overflow: hidden;
-
   border: 1px solid var(--card-border);
   border-radius: 2px;
-
   background: #fff;
   box-shadow: none;
-
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .card:hover {
@@ -180,24 +115,15 @@ body {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
-/* ================================
-   卡片顶部
-   ================================ */
-
 .card-head {
   display: flex;
   align-items: center;
-
   width: 100%;
   height: 38px;
   min-height: 38px;
-
   margin-bottom: 8px;
-
   gap: 7px;
-
   border-bottom: 1px solid var(--line);
-
   color: var(--title);
   font-size: 14px;
   font-weight: 400;
@@ -207,23 +133,16 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   flex: 0 0 auto;
-
   width: 18px;
   height: 17px;
-
-  line-height: 1;
 }
 
 .server-flag {
   display: block;
-
   width: 18px;
   height: 13px;
-
   object-fit: cover;
-
   border-radius: 1px;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
@@ -232,12 +151,9 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   flex: 0 0 auto;
-
   width: 17px;
   height: 17px;
-
   color: #777;
   font-size: 17px;
   line-height: 1;
@@ -246,45 +162,31 @@ body {
 .name {
   min-width: 0;
   flex: 1;
-
   overflow: hidden;
-
   color: #333;
   font-size: 14px;
   font-weight: 400;
-
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ================================
-   信息按钮
-   ================================ */
-
 .info {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   flex: 0 0 19px;
-
   width: 19px;
   height: 19px;
-
   padding: 0;
-
   border: 1px solid #d7d7d7;
   border-radius: 50%;
-
   background: #fff;
   color: #999;
-
   font-family: Arial, sans-serif;
   font-size: 12px;
   font-weight: 700;
   line-height: 17px;
-
   cursor: pointer;
 }
 
@@ -292,10 +194,6 @@ body {
   border-color: #3f8cff;
   color: #3f8cff;
 }
-
-/* ================================
-   指标区域
-   ================================ */
 
 .metrics {
   padding-top: 2px;
@@ -305,17 +203,15 @@ body {
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr);
   align-items: center;
-
   min-height: 30px;
-
   gap: 2px;
 }
 
-.metric-label {
+.metric-label,
+.text-label {
   overflow: hidden;
-
-  color: #999;
-  font-size: 11px;
+  color: #777;
+  font-size: var(--data-font-size);
   font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -323,25 +219,18 @@ body {
 
 .bar {
   position: relative;
-
   height: 5px;
-
   overflow: hidden;
-
   border-radius: 0;
-  background: #eee;
+  background: var(--bar-bg);
 }
 
 .bar-fill {
   height: 100%;
   min-width: 0;
-
   border-radius: 0;
   background: #1999e8;
-
-  transition:
-    width 0.35s ease,
-    background-color 0.2s ease;
+  transition: width 0.35s ease, background-color 0.2s ease;
 }
 
 .bar-fill.offline {
@@ -352,54 +241,33 @@ body {
   position: absolute;
   top: -7px;
   left: 7px;
-
   display: flex;
   align-items: center;
-
   height: 19px;
-
-  color: #777;
-  font-size: 11px;
+  color: #555;
+  font-size: var(--data-font-size);
   font-weight: 400;
-
+  line-height: 19px;
   white-space: nowrap;
 }
-
-/* ================================
-   文字数据行
-   ================================ */
 
 .text-row {
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr);
   align-items: center;
-
   min-height: 27px;
-
   gap: 2px;
-
   color: #777;
-  font-size: 12px;
+  font-size: var(--data-font-size);
   line-height: 19px;
   white-space: nowrap;
 }
 
-.text-label {
-  overflow: hidden;
-
-  color: #999;
-  font-size: 11px;
-
-  text-overflow: ellipsis;
-}
-
 .text-value {
   min-width: 0;
-
   overflow: hidden;
-
   color: #555;
-  font-size: 12px;
+  font-size: var(--data-font-size);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -409,24 +277,19 @@ body {
 .icon-load,
 .icon-cpu,
 .icon-ram,
-.icon-disk,
-.icon-time {
+.icon-disk {
   display: inline-block;
-
-  margin-right: 5px;
-
-  font-weight: 700;
-}
-
-.icon-down,
-.icon-up,
-.icon-time {
-  color: #000;
+  width: 15px;
+  margin-right: 3px;
+  color: #666;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1;
+  text-align: center;
 }
 
 .icon-load {
   color: var(--danger);
-  font-size: 17px;
 }
 
 .icon-cpu {
@@ -441,19 +304,11 @@ body {
   color: var(--disk);
 }
 
-.sep {
-  margin: 0 3px;
-  color: #666;
-}
-
 .status-dot {
   display: inline-block;
-
   width: 8px;
   height: 8px;
-
   margin-right: 6px;
-
   border-radius: 50%;
   background: #19a85b;
 }
@@ -462,36 +317,20 @@ body {
   background: #888;
 }
 
-/* ================================
-   加载和错误提示
-   ================================ */
-
-.loading,
 .error {
   padding: 28px;
-
-  color: #777;
-  text-align: center;
-}
-
-.error {
   border: 1px solid #ddd;
   border-radius: 6px;
   background: #fafafa;
+  color: #777;
+  text-align: center;
 }
-
-/* ================================
-   弹窗
-   ================================ */
 
 .modal-mask {
   position: fixed;
   z-index: 50;
   inset: 0;
-
   display: none;
-
-  background: transparent;
 }
 
 .modal-mask.show {
@@ -500,24 +339,14 @@ body {
 
 .modal {
   position: fixed;
-
   width: 330px;
   max-width: calc(100vw - 20px);
-
   padding: 17px 18px 12px;
-
   border: 1px solid #ddd;
   border-radius: 2px;
-
   background: #fff;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
-
   color: #555;
-  font-family:
-    Arial,
-    "Microsoft YaHei",
-    "PingFang SC",
-    sans-serif;
   font-size: 12px;
 }
 
@@ -528,11 +357,8 @@ body {
 .modal-grid {
   display: flex;
   flex-direction: column;
-
   gap: 9px;
-
   padding-right: 5px;
-
   color: #444;
   font-size: 12px;
   line-height: 1.35;
@@ -546,38 +372,19 @@ body {
   position: absolute;
   top: 12px;
   right: 12px;
-
   width: 20px;
   height: 20px;
-
-  margin: 0;
   padding: 0;
-
   border: 0;
-  border-radius: 2px;
-
   background: transparent;
   color: #438cf0;
-
   font-size: 20px;
   font-weight: 300;
   line-height: 18px;
-
   cursor: pointer;
 }
 
-/* ================================
-   响应式
-   ================================ */
-
-/*
-  不再在这里强制改成 5、3、2 列。
-  列数始终由 --layout-columns 控制。
-
-  屏幕太窄时，页面允许横向滚动，
-  这样后台设置 6 列时不会被媒体查询覆盖。
-*/
-
+/* 不在媒体查询中修改列数，列数始终由后台 CSS 控制 */
 @media (max-width: 1100px) {
   body {
     padding-right: 12px;
