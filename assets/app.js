@@ -161,16 +161,16 @@ function flagFallback(code) {
           <div class="text-row">
             <span class="text-label">网速</span>
             <span class="text-value">
-              <span class="icon-down">↓</span>${speed(server.net_in_speed)}
-              <span class="icon-up">↑</span>${speed(server.net_out_speed)}
+              <span class="icon-down">⭡</span>${speed(server.net_in_speed)}
+              <span class="icon-up">⭣</span>${speed(server.net_out_speed)}
             </span>
           </div>
 
           <div class="text-row">
             <span class="text-label">流量</span>
             <span class="text-value">
-              <span class="icon-down">↓</span>${bytes(server.net_rx)}
-              <span class="icon-up">↑</span>${bytes(server.net_tx)}
+              <span class="icon-down">⟲</span>${bytes(server.net_rx)}
+              <span class="icon-up">↺</span>${bytes(server.net_tx)}
             </span>
           </div>
 
@@ -186,7 +186,7 @@ function flagFallback(code) {
           <div class="text-row">
             <span class="text-label">负载</span>
             <span class="text-value">
-              <span class="icon-load">⌁</span>${esc(fmtLoad(server.load_avg))}
+              <span class="icon-load">෴</span>${esc(fmtLoad(server.load_avg))}
             </span>
           </div>
 
@@ -280,7 +280,7 @@ function flagFallback(code) {
       ["硬盘", `${capacity(s.disk_used)}/${capacity(s.disk_total)}`],
       ["内存", `${capacity(s.ram_used)}/${capacity(s.ram_total)}`],
       ["交换", swapText],
-      ["流量", `⬇ ${bytes(s.net_rx)} ⬆ ${bytes(s.net_tx)}`],
+      ["流量", `⇡ ${bytes(s.net_rx)} ⇣ ${bytes(s.net_tx)}`],
       ["负载", fmtLoad(s.load_avg)],
       ["进程数", num(s.processes)],
       ["连接数", `TCP ${num(s.tcp_conn)} / UDP ${num(s.udp_conn)}`],
