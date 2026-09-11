@@ -161,8 +161,8 @@ function flagFallback(code) {
           <div class="text-row">
             <span class="text-label">网速</span>
             <span class="text-value">
-              <span class="icon-down">⤴⤴</span>${speed(server.net_in_speed)}
-              <span class="icon-up">⤵⤵</span>${speed(server.net_out_speed)}
+              <span class="icon-down">⤴</span>${speed(server.net_in_speed)}
+              <span class="icon-up">⤵</span>${speed(server.net_out_speed)}
             </span>
           </div>
 
@@ -178,8 +178,8 @@ function flagFallback(code) {
             <span class="text-label">信息</span>
             <span class="text-value">
               <span class="icon-cpu">⚙</span>${num(server.cpu_cores)} Cores
-              <span class="icon-ram">▤</span>${capacity(server.ram_total)}
-              <span class="icon-disk">⎚</span>${capacity(server.disk_total)}
+              <span class="icon-ram">⎚</span>${capacity(server.ram_total)}
+              <span class="icon-disk">▤</span>${capacity(server.disk_total)}
             </span>
           </div>
 
