@@ -199,9 +199,9 @@ function flagFallback(code) {
           <div class="text-row">
             <span class="text-label">信息</span>
             <span class="text-value">
-              <span class="icon-cpu">❄</span>${num(server.cpu_cores)} Cores
-              <span class="icon-ram">⎚</span>${capacity(server.ram_total)}
-              <span class="icon-disk">❒</span>${capacity(server.disk_total)}
+              <span class="icon-cpu">❄</span>${num(server.cpu_cores)} Cs
+              <span class="icon-ram">⎚</span>${capacity(server.ram_total)} 
+              <span class="icon-disk">❒</span>${capacity(server.disk_total)} 
             </span>
           </div>
 
