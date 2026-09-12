@@ -247,7 +247,7 @@ function flagFallback(code) {
           <span></span>
           <span></span>
         </div>
-        <a class="admin-link" href="/admin#/admin" aria-label="登录">!</a>
+        <a class="admin-link" href="/admin#/admin" aria-label="登录">☁</a>
         <div class="server-grid">${servers.map(card).join("")}</div>
       </section>
     `).join("");
