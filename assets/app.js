@@ -242,6 +242,11 @@ function flagFallback(code) {
     const groups = groupedServers();
     app.innerHTML = Array.from(groups.entries()).map(([name, servers]) => `
       <section class="group" data-group="${esc(name)}">
+        <div class="ws-status" id="ws-status">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
         <a class="admin-link" href="/admin#/admin" aria-label="登录">!</a>
         <div class="server-grid">${servers.map(card).join("")}</div>
       </section>
