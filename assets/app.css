@@ -191,7 +191,9 @@ body { padding: 10px 22px 18px; overflow-x: auto; }
   font-weight: 700;
 }
 
-.icon-down, .icon-up, .icon-time { color: #000; }
+.icon-down { color: #4986e8; }
+.icon-up { color: var(--green); }
+.icon-time { color: #000; }
 .icon-load { color: var(--danger); font-size: 19px; }
 .icon-cpu { color: #4986e8; }
 .icon-ram { color: var(--green); }
@@ -392,7 +394,7 @@ body{background:#fff;}
 }
 
 .metric-label{
-  font-size:12px !important;
+  font-size:13px !important;
   color:#555 !important;
   font-weight:400 !important;
 }
