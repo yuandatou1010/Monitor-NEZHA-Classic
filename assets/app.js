@@ -376,60 +376,126 @@ function flagFallback(code) {
     }
   }
 
-  function connectWS() {
-    if (state.ws) {
-      try { state.ws.close(); } catch (_) {}
+function connectWS() {
+  if (state.ws) {
+    try { state.ws.close(); } catch (_) {}
+  }
+
+  // 后台设置：
+  // frontend_ws_timeout_minutes
+  // 0 = 不限制
+  // >0 = WSS 建立后持续指定分钟，然后主动关闭
+  const timeoutMinutes = Number(
+    state.config?.frontend_ws_timeout_minutes ?? 0
+  );
+
+  const wsLifetimeMs =
+    Number.isFinite(timeoutMinutes) &&
+    timeoutMinutes > 0
+      ? timeoutMinutes * 60 * 1000
+      : 0;
+
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  const url = new URL(`${protocol}//${location.host}/api/ws`);
+  url.searchParams.set("subscribe", "all");
+
+  const token = localStorage.getItem("jwt_token");
+  if (
+    token &&
+    state.config.is_public !== true &&
+    state.config.is_public !== "true"
+  ) {
+    url.searchParams.set("token", token);
+  }
+
+  const ws = new WebSocket(url.toString());
+  state.ws = ws;
+
+  // 当前这条连接自己的生命周期计时器
+  let lifetimeTimer = null;
+
+  ws.onopen = () => {
+    const ids = state.servers.map(s => s.id).filter(Boolean);
+
+    try {
+      ws.send(JSON.stringify({
+        type: "subscribe",
+        scope: "all",
+        ids
+      }));
+    } catch (_) {}
+
+    // 清理旧计时器
+    if (lifetimeTimer) {
+      clearTimeout(lifetimeTimer);
+      lifetimeTimer = null;
     }
 
-    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    const url = new URL(`${protocol}//${location.host}/api/ws`);
-    url.searchParams.set("subscribe", "all");
+    // 后台设置 > 0 才启动生命周期限制
+    if (wsLifetimeMs > 0) {
+      lifetimeTimer = setTimeout(() => {
+        // 到达后台设定时间：
+        // 只关闭当前 WSS，不刷新页面，不重新连接
+        try {
+          ws.close(1000, "frontend websocket timeout");
+        } catch (_) {}
 
-    const token = localStorage.getItem("jwt_token");
-    if (token && state.config.is_public !== true && state.config.is_public !== "true") {
-      url.searchParams.set("token", token);
+        state.ws = null;
+      }, wsLifetimeMs);
     }
+  };
 
-    const ws = new WebSocket(url.toString());
-    state.ws = ws;
+  ws.onmessage = ev => {
+    try {
+      const msg = JSON.parse(ev.data);
 
-    ws.onopen = () => {
-      const ids = state.servers.map(s => s.id).filter(Boolean);
-      try {
-        ws.send(JSON.stringify({ type: "subscribe", scope: "all", ids }));
-      } catch (_) {}
-    };
+      if (msg.type !== "batchUpdate") return;
 
-    ws.onmessage = ev => {
-      try {
-        const msg = JSON.parse(ev.data);
-        if (msg.type !== "batchUpdate") return;
+      for (const u of msg.updates || []) {
+        if (!u || !u.serverId) continue;
 
-        for (const u of msg.updates || []) {
-          if (!u || !u.serverId) continue;
-          for (const sample of u.samples || []) {
-            if (!sample || typeof sample !== "object") continue;
-            const data = sample.data || sample.payload || sample.metrics;
-            if (data) mergeServer(u.serverId, data);
+        for (const sample of u.samples || []) {
+          if (!sample || typeof sample !== "object") continue;
+
+          const data =
+            sample.data ||
+            sample.payload ||
+            sample.metrics;
+
+          if (data) {
+            mergeServer(u.serverId, data);
           }
         }
-
-        state.servers = state.servers.map(s => state.serverMap.get(s.id) || s);
-        updateVisibleCards();
-      } catch (err) {
-        console.warn("WS message error", err);
       }
-    };
 
-    ws.onclose = () => {
-      // 不主动重连。WSS 生命周期由后台设置控制，避免持续占用 CF 额度。
-      state.ws = null;
-    };
+      state.servers = state.servers.map(
+        s => state.serverMap.get(s.id) || s
+      );
 
-    ws.onerror = () => {
-      try { ws.close(); } catch (_) {}
-    };
-  }
+      updateVisibleCards();
+
+    } catch (err) {
+      console.warn("WS message error", err);
+    }
+  };
+
+  ws.onclose = () => {
+    if (lifetimeTimer) {
+      clearTimeout(lifetimeTimer);
+      lifetimeTimer = null;
+    }
+
+    // 不自动重连。
+    // WSS 是否持续、持续多久，完全由后台 frontend_ws_timeout_minutes 控制。
+    state.ws = null;
+  };
+
+  ws.onerror = () => {
+    try {
+      ws.close();
+    } catch (_) {}
+  };
+}
 
   function demoData() {
     const now = Date.now();
