@@ -466,8 +466,8 @@ body{background:#fff;}
   --card-height: 333px;
   --card-column-gap: 27px;
   --card-row-gap: 23px;
-  --group-padding-x: 35px;
-  --group-padding-y: 30px;
+  --group-padding-x: 28px;
+  --group-padding-y: 28px;
   --outer-max-width: 2033px;
   --layout-y-offset: -5px;
   --bar-zero-width: 30px;
@@ -501,7 +501,7 @@ body {
   position: absolute;
   top: 7px;
   right: 10px;
-  color: #000 !important;
+  color: #AB0000 !important;
   text-decoration: none;
   font-size: 18px;
   font-weight: 700;
@@ -515,7 +515,7 @@ body {
 }
 .admin-link::before,
 .admin-link::after { content: none !important; }
-.admin-link:hover { color: #000 !important; text-decoration: none; }
+.admin-link:hover { color: #AB0000 !important; text-decoration: none; }
 
 /* 默认 6 列；JS 不再写死列数，后台变量可以直接接管 */
 .server-grid {
@@ -615,8 +615,8 @@ body {
 
 .ws-status span {
   display: block;
-  width: 5px;
-  height: 5px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
 
   background: #147310;
