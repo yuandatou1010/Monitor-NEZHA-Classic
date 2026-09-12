@@ -420,6 +420,11 @@ function connectWS() {
   let lifetimeTimer = null;
 
   ws.onopen = () => {
+    const wsStatus = document.getElementById("ws-status");
+    if (wsStatus) {
+      wsStatus.classList.remove("disconnected");
+      wsStatus.classList.add("connected");
+    }
     const ids = state.servers.map(s => s.id).filter(Boolean);
 
     try {
@@ -485,6 +490,11 @@ function connectWS() {
   };
 
   ws.onclose = () => {
+    const wsStatus = document.getElementById("ws-status");
+    if (wsStatus) {
+      wsStatus.classList.remove("connected");
+      wsStatus.classList.add("disconnected");
+    }
     if (lifetimeTimer) {
       clearTimeout(lifetimeTimer);
       lifetimeTimer = null;
