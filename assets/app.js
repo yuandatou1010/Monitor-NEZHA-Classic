@@ -242,7 +242,7 @@ function flagFallback(code) {
     const groups = groupedServers();
     app.innerHTML = Array.from(groups.entries()).map(([name, servers]) => `
       <section class="group" data-group="${esc(name)}">
-        <a class="admin-link" href="/admin#/admin">登录</a>
+        <a class="admin-link" href="/admin#/admin" aria-label="登录">!</a>
         <div class="server-grid">${servers.map(card).join("")}</div>
       </section>
     `).join("");
@@ -318,15 +318,7 @@ function flagFallback(code) {
   function mergeServer(id, data) {
     const current = state.serverMap.get(id);
     if (!current || !data) return;
-    // 与官方前端保持一致：WS 收到数据时，将 last_updated 设为“收到时间”。
-    // 不能继续使用 Agent 上报时的旧时间，否则约 5 分钟后会被误判为离线。
-    const receiveTs = Date.now();
-    state.serverMap.set(id, Object.assign({}, current, data, {
-      id,
-      sample_timestamp: Number(data.sample_timestamp || data.last_updated || data.timestamp || receiveTs),
-      last_updated: receiveTs,
-      timestamp: receiveTs
-    }));
+    state.serverMap.set(id, Object.assign({}, current, data, { id }));
   }
 
   async function load() {
@@ -430,8 +422,8 @@ function flagFallback(code) {
     };
 
     ws.onclose = () => {
-      clearTimeout(state.reconnectTimer);
-      state.reconnectTimer = setTimeout(connectWS, 5000);
+      // 不主动重连。WSS 生命周期由后台设置控制，避免持续占用 CF 额度。
+      state.ws = null;
     };
 
     ws.onerror = () => {
