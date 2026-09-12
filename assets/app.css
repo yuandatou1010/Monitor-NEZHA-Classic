@@ -529,8 +529,8 @@ body {
 
 /* 四个资源条的百分比文字统一为浅蓝灰色 */
 .metric-label {
-  font-size: 9px !important;
-  color: #000000 !important;
+  font-size: 12px !important;
+  color: #555 !important;
   font-weight: 400 !important;
 }
 
@@ -540,7 +540,7 @@ body {
 
 /* 0% 时保留极细蓝色起始点，保证所有条的视觉起点完全一致 */
 .bar-fill {
-  min-width: 20;
+  min-width: 20%;
 }
 
 /* 仅 0% 时显示 20px 蓝色起点；其他百分比保持真实比例 */
