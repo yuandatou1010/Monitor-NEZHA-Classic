@@ -466,10 +466,10 @@ body{background:#fff;}
   --card-height: 333px;
   --card-column-gap: 27px;
   --card-row-gap: 23px;
-  --group-padding-x: 48px;
-  --group-padding-y: 39px;
+  --group-padding-x: 35px;
+  --group-padding-y: 30px;
   --outer-max-width: 2033px;
-  --layout-y-offset: -50px;
+  --layout-y-offset: -5px;
   --bar-zero-width: 30px;
 }
 
