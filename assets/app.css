@@ -596,3 +596,39 @@ body {
 
 /* 不显示旧版分组标题/折叠符号；布局仍由 --cards-per-row 等变量控制 */
 .group-title { display: none !important; }
+
+
+/* ===== WSS 状态指示器 ===== */
+
+.ws-status {
+  position: absolute;
+  top: 12px;
+  left: 18px;
+
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  height: 12px;
+  z-index: 20;
+}
+
+.ws-status span {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+
+  background: #999;
+  transition: background-color 0.2s ease;
+}
+
+/* WSS 已连接 */
+.ws-status.connected span {
+  background: #22c55e;
+}
+
+/* WSS 已断开 */
+.ws-status.disconnected span {
+  background: #999;
+}
