@@ -127,7 +127,7 @@ body { padding: 10px 22px 18px; overflow-x: auto; }
   grid-template-columns: 46px minmax(0, 1fr);
   align-items: center;
   gap: 2px;
-  min-height: 30px;
+  min-height: 27px;
 }
 
 .metric-label {
@@ -467,7 +467,7 @@ body{background:#fff;}
   --group-padding-y: 39px;
   --outer-max-width: 2033px;
   --layout-y-offset: -50px;
-  --bar-zero-width: 39px;
+  --bar-zero-width: 30px;
 }
 
 /* 页面整体：外框水平、垂直居中，再整体向上 50px */
@@ -540,12 +540,12 @@ body {
 
 /* 0% 时保留极细蓝色起始点，保证所有条的视觉起点完全一致 */
 .bar-fill {
-  min-width: 20%;
+  min-width: 15%;
 }
 
 /* 仅 0% 时显示 20px 蓝色起点；其他百分比保持真实比例 */
-.bar-fill[style*="width:20%"],
-.bar-fill[style*="width: 20%"] {
+.bar-fill[style*="width:15%"],
+.bar-fill[style*="width: 15%"] {
   width: var(--bar-zero-width) !important;
   min-width: var(--bar-zero-width) !important;
 }
