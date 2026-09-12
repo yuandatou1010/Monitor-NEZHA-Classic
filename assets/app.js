@@ -112,12 +112,35 @@ function flagFallback(code) {
   }
 
   function osIcon(server) {
-    const os = String(server.os || "").toLowerCase();
-    if (os.includes("windows")) return "▣";
-    if (os.includes("ubuntu") || os.includes("debian") || os.includes("linux") ||
-        os.includes("alpine") || os.includes("centos") || os.includes("openwrt")) return "◉";
-    if (os.includes("mac") || os.includes("darwin")) return "◌";
-    return "◉";
+    const os = String(server.os || '').toLowerCase().trim();
+    const map = [
+      ['almalinux', 'os-alma.svg'], ['alma', 'os-alma.svg'],
+      ['alpine', 'os-alpine.webp'],
+      ['centos', 'os-centos.svg'], ['cent os', 'os-centos.svg'],
+      ['debian', 'os-debian.svg'], ['debian gnu/linux', 'os-debian.svg'], ['deb', 'os-debian.svg'],
+      ['ubuntu', 'os-ubuntu.svg'], ['elementary', 'os-ubuntu.svg'],
+      ['macos', 'os-macos.svg'], ['mac os', 'os-macos.svg'], ['darwin', 'os-macos.svg'], ['os x', 'os-macos.svg'],
+      ['windows', 'os-windows.svg'], ['win32', 'os-windows.svg'], ['win64', 'os-windows.svg'], ['win10', 'os-windows.svg'], ['win11', 'os-windows.svg'], ['win server', 'os-windows.svg'], ['microsoft', 'os-windows.svg'],
+      ['arch', 'os-arch.svg'], ['archlinux', 'os-arch.svg'], ['arch linux', 'os-arch.svg'],
+      ['kali', 'os-kail.svg'], ['kail', 'os-kail.svg'],
+      ['istoreos', 'os-istore.png'], ['istore', 'os-istore.png'],
+      ['openwrt', 'os-openwrt.svg'], ['open wrt', 'os-openwrt.svg'], ['open-wrt', 'os-openwrt.svg'], ['qwrt', 'os-openwrt.svg'], ['kwrt', 'os-openwrt.svg'],
+      ['immortalwrt', 'os-openwrt.svg'], ['immortal', 'os-openwrt.svg'],
+      ['nixos', 'os-nix.svg'], ['nix os', 'os-nix.svg'],
+      ['rocky', 'os-rocky.svg'], ['fedora', 'os-fedora.svg'],
+      ['opensuse', 'os-openSUSE.svg'], ['open suse', 'os-openSUSE.svg'], ['suse', 'os-openSUSE.svg'],
+      ['gentoo', 'os-gentoo.svg'], ['redhat', 'os-redhat.svg'], ['rhel', 'os-redhat.svg'], ['red hat', 'os-redhat.svg'],
+      ['mint', 'os-mint.svg'], ['linux mint', 'os-mint.svg'],
+      ['manjaro', 'os-manjaro-.svg'], ['armbian', 'os-armbian.png'], ['armbox', 'os-armbian.png'],
+      ['synology', 'os-synology.ico'], ['dsm', 'os-synology.ico'],
+      ['proxmox', 'os-proxmox.ico'], ['pve', 'os-proxmox.ico'],
+      ['alibaba', 'os-alibaba.svg'], ['aliyun', 'os-alibaba.svg'], ['alinux', 'os-alibaba.svg'], ['anolis', 'os-alibaba.svg'], ['openanolis', 'os-alibaba.svg'], ['阿里', 'os-alibaba.svg'], ['龙蜥', 'os-alibaba.svg'],
+      ['opencloud', 'os-opencloud.svg'], ['opencloudos', 'os-opencloud.svg'],
+      ['oracle', 'os-oracle.svg'], ['oracle linux', 'os-oracle.svg']
+    ];
+    const hit = map.find(([keyword]) => os.includes(keyword));
+    const image = hit ? hit[1] : 'os-unknown.svg';
+    return `<img src="/os-icons/${image}" alt="" title="${esc(server.os || 'Unknown')}" onerror="this.src='/os-icons/os-unknown.svg'">`;
   }
 
   function groupName(server) {
@@ -223,8 +246,9 @@ function flagFallback(code) {
         <h2 class="group-title" data-collapse="${esc(name)}">
           <span class="group-arrow">▼</span>
           <span>${esc(name)}</span>
+          <a class="admin-link" href="/admin#/admin">登录</a>
         </h2>
-        <div class="server-grid" style="grid-template-columns:repeat(${Math.min(5, servers.length)}, 278px)">${servers.map(card).join("")}</div>
+        <div class="server-grid">${servers.map(card).join("")}</div>
       </section>
     `).join("");
 
@@ -334,6 +358,31 @@ function flagFallback(code) {
     }
   }
 
+  function updateVisibleCards() {
+    for (const s of state.servers) {
+      const el = document.querySelector(`.card[data-id="${CSS.escape(String(s.id))}"]`);
+      if (!el) continue;
+      const offline = !online(s);
+      const ramPct = percent(s.ram_used, s.ram_total);
+      const swapPct = percent(s.swap_used, s.swap_total);
+      const diskPct = percent(s.disk_used, s.disk_total);
+      const values = [s.cpu, ramPct, swapPct, diskPct];
+      el.querySelectorAll('.bar-fill').forEach((bar,i) => {
+        bar.style.width = `${clamp(num(values[i]),0,100)}%`;
+        bar.classList.toggle('offline', offline);
+      });
+      el.querySelectorAll('.bar-value').forEach((v,i) => v.textContent = fmtPct(values[i]));
+      const rows = el.querySelectorAll('.text-row');
+      if (rows[0]) rows[0].querySelector('.text-value').innerHTML = `<span class="icon-down">⬇</span>${speed(s.net_in_speed)} <span class="icon-up">⬆</span>${speed(s.net_out_speed)}`;
+      if (rows[1]) rows[1].querySelector('.text-value').innerHTML = `<span class="icon-down">⬇</span>${bytes(s.net_rx)} <span class="icon-up">⬆</span>${bytes(s.net_tx)}`;
+      if (rows[2]) rows[2].querySelector('.text-value').innerHTML = `<span class="icon-cpu">⚙</span>${num(s.cpu_cores)} Cores <span class="icon-ram">▤</span>${capacity(s.ram_total)} <span class="icon-disk">▱</span>${capacity(s.disk_total)}`;
+      if (rows[3]) rows[3].querySelector('.text-value').innerHTML = `<span class="icon-load">〽</span>${esc(fmtLoad(s.load_avg))}`;
+      if (rows[4]) rows[4].querySelector('.text-value').innerHTML = `<span class="status-dot ${offline ? 'offline' : ''}"></span>${uptime(s.boot_time)}`;
+      const name = el.querySelector('.name');
+      if (name) { name.textContent = `${s.name || 'Unnamed'}${offline ? '[已离线]' : ''}`; name.title = s.name || ''; }
+    }
+  }
+
   function connectWS() {
     if (state.ws) {
       try { state.ws.close(); } catch (_) {}
@@ -370,7 +419,7 @@ function flagFallback(code) {
         }
 
         state.servers = state.servers.map(s => state.serverMap.get(s.id) || s);
-        render();
+        updateVisibleCards();
       } catch (err) {
         console.warn("WS message error", err);
       }
