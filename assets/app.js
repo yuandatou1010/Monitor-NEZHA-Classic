@@ -199,9 +199,9 @@ function flagFallback(code) {
           <div class="text-row">
             <span class="text-label">信息</span>
             <span class="text-value">
-              <span class="icon-cpu">❄</span>${num(server.cpu_cores)} Cs
-              <span class="icon-ram">⎚</span>${capacity(server.ram_total)} 
-              <span class="icon-disk">❒</span>${capacity(server.disk_total)} 
+              <span class="icon-cpu">⌘</span>${num(server.cpu_cores)}Core
+              <span class="icon-ram">⚿</span>${capacity(server.ram_total)} 
+              <span class="icon-disk">⎙</span>${capacity(server.disk_total)} 
             </span>
           </div>
 
@@ -243,8 +243,6 @@ function flagFallback(code) {
     app.innerHTML = Array.from(groups.entries()).map(([name, servers]) => `
       <section class="group" data-group="${esc(name)}">
         <div class="ws-status" id="ws-status">
-          <span></span>
-          <span></span>
           <span></span>
         </div>
         <a class="admin-link" href="/admin#/admin" aria-label="登录">☁</a>
@@ -371,7 +369,7 @@ function flagFallback(code) {
       const rows = el.querySelectorAll('.text-row');
       if (rows[0]) rows[0].querySelector('.text-value').innerHTML = `<span class="icon-down">⤵</span>${speed(s.net_in_speed)} <span class="icon-up">⤴</span>${speed(s.net_out_speed)}`;
       if (rows[1]) rows[1].querySelector('.text-value').innerHTML = `<span class="icon-down">⇊</span>${bytes(s.net_rx)} <span class="icon-up">⇈</span>${bytes(s.net_tx)}`;
-      if (rows[2]) rows[2].querySelector('.text-value').innerHTML = `<span class="icon-cpu">❄</span>${num(s.cpu_cores)} Cs <span class="icon-ram">⎚</span>${capacity(s.ram_total)}  <span class="icon-disk">❒</span>${capacity(s.disk_total)} `;
+      if (rows[2]) rows[2].querySelector('.text-value').innerHTML = `<span class="icon-cpu">⌘</span>${num(s.cpu_cores)}Core <span class="icon-ram">⚿</span>${capacity(s.ram_total)}  <span class="icon-disk">⎙</span>${capacity(s.disk_total)} `;
       if (rows[3]) rows[3].querySelector('.text-value').innerHTML = `<span class="icon-load">▫▪▫</span>${esc(fmtLoad(s.load_avg))}`;
       if (rows[4]) rows[4].querySelector('.text-value').innerHTML = `<span class="status-dot ${offline ? 'offline' : ''}"></span>${uptime(s.boot_time)}`;
       const name = el.querySelector('.name');
