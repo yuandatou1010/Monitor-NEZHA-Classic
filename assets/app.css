@@ -137,14 +137,14 @@ body { padding: 10px 22px 18px; overflow-x: auto; }
 
 .bar {
   position: relative;
-  height: 30px;
+  height: 25px;
   border-radius: 4px;
   background: var(--bar-bg);
   overflow: hidden;
 }
 
 .bar-fill {
-  height: 90%;
+  height: 100%;
   min-width: 0;
   border-radius: 4px;
   background: #1999e8;
@@ -155,7 +155,7 @@ body { padding: 10px 22px 18px; overflow-x: auto; }
 
 .bar-value {
   position: absolute;
-  left: 7px;
+  left: 5px;
   top: 0;
   height: 25px;
   display: flex;
