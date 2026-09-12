@@ -392,8 +392,8 @@ body{background:#fff;}
 }
 
 .metric-label{
-  font-size:9px !important;
-  color:#999 !important;
+  font-size:12px !important;
+  color:#555 !important;
   font-weight:400 !important;
 }
 .metric-value{
