@@ -602,7 +602,7 @@ body {
 
 .ws-status {
   position: absolute;
-  top: 12px;
+  top: 5px;
   left: 18px;
 
   display: flex;
@@ -619,16 +619,16 @@ body {
   height: 5px;
   border-radius: 50%;
 
-  background: #999;
+  background: #147310;
   transition: background-color 0.2s ease;
 }
 
 /* WSS 已连接 */
 .ws-status.connected span {
-  background: #22c55e;
+  background: #0DAD00;
 }
 
 /* WSS 已断开 */
 .ws-status.disconnected span {
-  background: #999;
+  background: #A0ADA0;
 }
