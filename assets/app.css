@@ -127,7 +127,7 @@ body { padding: 10px 22px 18px; overflow-x: auto; }
   grid-template-columns: 46px minmax(0, 1fr);
   align-items: center;
   gap: 2px;
-  min-height: 27px;
+  min-height: 23px;
 }
 
 .metric-label {
@@ -137,7 +137,7 @@ body { padding: 10px 22px 18px; overflow-x: auto; }
 
 .bar {
   position: relative;
-  height: 25px;
+  height: 23px;
   border-radius: 4px;
   background: var(--bar-bg);
   overflow: hidden;
@@ -157,7 +157,7 @@ body { padding: 10px 22px 18px; overflow-x: auto; }
   position: absolute;
   left: 5px;
   top: 0;
-  height: 20px;
+  height: 23px;
   display: flex;
   align-items: center;
   color: #fff;
