@@ -392,7 +392,7 @@ body{background:#fff;}
 }
 
 .metric-label{
-  font-size:11px !important;
+  font-size:9px !important;
   color:#999 !important;
   font-weight:400 !important;
 }
@@ -464,10 +464,10 @@ body{background:#fff;}
   --card-column-gap: 27px;
   --card-row-gap: 23px;
   --group-padding-x: 48px;
-  --group-padding-y: 13px;
+  --group-padding-y: 39px;
   --outer-max-width: 2033px;
   --layout-y-offset: -50px;
-  --bar-zero-width: 20px;
+  --bar-zero-width: 39px;
 }
 
 /* 页面整体：外框水平、垂直居中，再整体向上 50px */
@@ -529,8 +529,8 @@ body {
 
 /* 四个资源条的百分比文字统一为浅蓝灰色 */
 .metric-label {
-  font-size: 15px !important;
-  color: #555 !important;
+  font-size: 9px !important;
+  color: #000000 !important;
   font-weight: 400 !important;
 }
 
@@ -544,8 +544,8 @@ body {
 }
 
 /* 仅 0% 时显示 20px 蓝色起点；其他百分比保持真实比例 */
-.bar-fill[style*="width:0%"],
-.bar-fill[style*="width: 0%"] {
+.bar-fill[style*="width:20%"],
+.bar-fill[style*="width: 20%"] {
   width: var(--bar-zero-width) !important;
   min-width: var(--bar-zero-width) !important;
 }
