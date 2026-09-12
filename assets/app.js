@@ -170,7 +170,7 @@ function flagFallback(code) {
       <article class="card" data-id="${esc(server.id)}">
         <header class="card-head">
           <span class="flag">${flag(server)}</span>
-          <span class="name" title="${esc(server.name)}">${esc(server.name || "Unnamed")}${offline ? "[已离线]" : ""}</span>
+          <span class="name" title=ㅤㅤ"${esc(server.name)}">${esc(server.name || "Unnamed")}${offline ? "[已离线]" : ""}</span>
           <button class="info" type="button" data-info="${esc(server.id)}" aria-label="服务器信息">${osIcon(server)}</button>
         </header>
 
@@ -192,7 +192,7 @@ function flagFallback(code) {
             <span class="text-label">流量</span>
             <span class="text-value">
               <span class="icon-down">⇊</span>${bytes(server.net_rx)}
-              <span class="icon-up">  ⇈</span>${bytes(server.net_tx)}
+              <span class="icon-up">ㅤ⇈</span>${bytes(server.net_tx)}
             </span>
           </div>
 
@@ -208,7 +208,7 @@ function flagFallback(code) {
           <div class="text-row">
             <span class="text-label">负载</span>
             <span class="text-value">
-              <span class="icon-load">☁</span>${esc(fmtLoad(server.load_avg))}
+              <span class="icon-load">☲</span>${esc(fmtLoad(server.load_avg))}
             </span>
           </div>
 
@@ -367,7 +367,7 @@ function flagFallback(code) {
       if (rows[0]) rows[0].querySelector('.text-value').innerHTML = `<span class="icon-down">⤵</span>${speed(s.net_in_speed)} <span class="icon-up">⤴</span>${speed(s.net_out_speed)}`;
       if (rows[1]) rows[1].querySelector('.text-value').innerHTML = `<span class="icon-down">⇊</span>${bytes(s.net_rx)} <span class="icon-up">⇈</span>${bytes(s.net_tx)}`;
       if (rows[2]) rows[2].querySelector('.text-value').innerHTML = `<span class="icon-cpu">❄</span>${num(s.cpu_cores)} Cores <span class="icon-ram">⎚</span>${capacity(s.ram_total)} <span class="icon-disk">▤</span>${capacity(s.disk_total)}`;
-      if (rows[3]) rows[3].querySelector('.text-value').innerHTML = `<span class="icon-load">☁</span>${esc(fmtLoad(s.load_avg))}`;
+      if (rows[3]) rows[3].querySelector('.text-value').innerHTML = `<span class="icon-load">☲</span>${esc(fmtLoad(s.load_avg))}`;
       if (rows[4]) rows[4].querySelector('.text-value').innerHTML = `<span class="status-dot ${offline ? 'offline' : ''}"></span>${uptime(s.boot_time)}`;
       const name = el.querySelector('.name');
       if (name) { name.textContent = `${s.name || 'Unnamed'}${offline ? '[已离线]' : ''}`; name.title = s.name || ''; }
