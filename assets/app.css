@@ -603,7 +603,7 @@ body {
 .ws-status {
   position: absolute;
   top: 5px;
-  left: 18px;
+  left: 8px;
 
   display: flex;
   align-items: center;
@@ -615,8 +615,8 @@ body {
 
 .ws-status span {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
 
   background: #147310;
