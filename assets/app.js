@@ -170,9 +170,8 @@ function flagFallback(code) {
       <article class="card" data-id="${esc(server.id)}">
         <header class="card-head">
           <span class="flag">${flag(server)}</span>
-          <span class="os">${osIcon(server)}</span>
           <span class="name" title="${esc(server.name)}">${esc(server.name || "Unnamed")}${offline ? "[已离线]" : ""}</span>
-          <button class="info" type="button" data-info="${esc(server.id)}" aria-label="服务器信息">i</button>
+          <button class="info" type="button" data-info="${esc(server.id)}" aria-label="服务器信息">${osIcon(server)}</button>
         </header>
 
         <div class="metrics">
@@ -243,11 +242,7 @@ function flagFallback(code) {
     const groups = groupedServers();
     app.innerHTML = Array.from(groups.entries()).map(([name, servers]) => `
       <section class="group" data-group="${esc(name)}">
-        <h2 class="group-title" data-collapse="${esc(name)}">
-          <span class="group-arrow">▼</span>
-          <span>${esc(name)}</span>
-          <a class="admin-link" href="/admin#/admin">登录</a>
-        </h2>
+        <a class="admin-link" href="/admin#/admin">登录</a>
         <div class="server-grid">${servers.map(card).join("")}</div>
       </section>
     `).join("");
@@ -256,10 +251,6 @@ function flagFallback(code) {
   }
 
   function bindEvents() {
-    document.querySelectorAll("[data-collapse]").forEach(el => {
-      el.addEventListener("click", () => el.closest(".group").classList.toggle("collapsed"));
-    });
-
     document.querySelectorAll("[data-info]").forEach(btn => {
       btn.addEventListener("click", () => {
         const s = state.serverMap.get(btn.dataset.info);
@@ -313,11 +304,11 @@ function flagFallback(code) {
     const btn = document.querySelector(`[data-info="${CSS.escape(String(s.id))}"]`);
     if (btn) {
       const r = btn.getBoundingClientRect();
-      const mw = 330;
+      const mw = 328;
       let left = r.right - mw;
       let top = r.bottom + 7;
       left = Math.max(10, Math.min(left, window.innerWidth - mw - 10));
-      if (top + 330 > window.innerHeight) top = Math.max(10, r.top - 340);
+      if (top + 330 > window.innerHeight) top = Math.max(10, r.top - 338);
       modal.querySelector(".modal").style.left = `${left}px`;
       modal.querySelector(".modal").style.top = `${top}px`;
     }
@@ -326,8 +317,16 @@ function flagFallback(code) {
 
   function mergeServer(id, data) {
     const current = state.serverMap.get(id);
-    if (!current) return;
-    state.serverMap.set(id, Object.assign({}, current, data, { id }));
+    if (!current || !data) return;
+    // 与官方前端保持一致：WS 收到数据时，将 last_updated 设为“收到时间”。
+    // 不能继续使用 Agent 上报时的旧时间，否则约 5 分钟后会被误判为离线。
+    const receiveTs = Date.now();
+    state.serverMap.set(id, Object.assign({}, current, data, {
+      id,
+      sample_timestamp: Number(data.sample_timestamp || data.last_updated || data.timestamp || receiveTs),
+      last_updated: receiveTs,
+      timestamp: receiveTs
+    }));
   }
 
   async function load() {
@@ -380,6 +379,8 @@ function flagFallback(code) {
       if (rows[4]) rows[4].querySelector('.text-value').innerHTML = `<span class="status-dot ${offline ? 'offline' : ''}"></span>${uptime(s.boot_time)}`;
       const name = el.querySelector('.name');
       if (name) { name.textContent = `${s.name || 'Unnamed'}${offline ? '[已离线]' : ''}`; name.title = s.name || ''; }
+      const info = el.querySelector('.info');
+      if (info) info.innerHTML = osIcon(s);
     }
   }
 
@@ -413,8 +414,11 @@ function flagFallback(code) {
         if (msg.type !== "batchUpdate") return;
 
         for (const u of msg.updates || []) {
+          if (!u || !u.serverId) continue;
           for (const sample of u.samples || []) {
-            if (sample && sample.data) mergeServer(u.serverId, sample.data);
+            if (!sample || typeof sample !== "object") continue;
+            const data = sample.data || sample.payload || sample.metrics;
+            if (data) mergeServer(u.serverId, data);
           }
         }
 
