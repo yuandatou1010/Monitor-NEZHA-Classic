@@ -465,132 +465,127 @@ body{background:#fff;}
 }
 
 
-/* ===== 后台可自定义布局配置 ===== */
+/* ===== 后台可自定义布局配置：融合版 =====
+   后台以后只需要覆盖这些变量，不需要重写组件 CSS。
+   例如：
+   :root { --cards-per-row: 5; }
+   :root { --card-width: 300px; --card-height: 360px; }
+   :root { --group-padding-x: 48px; --group-padding-y: 26px; }
+*/
 :root {
-  /*
-   * 后台未来可以覆盖这些变量。
-   *
-   * 例如：
-   * --cards-per-row: 5;
-   * --card-width: 300px;
-   * --card-height: 360px;
-   */
-
-  /* 默认桌面端每排 6 个卡片 */
   --cards-per-row: 6;
-
-  /* 单张卡片尺寸 */
   --card-width: 278px;
   --card-height: 333px;
-
-  /* 卡片之间的间距，原来约为 27px / 23px，现扩大一倍 */
   --card-column-gap: 27px;
   --card-row-gap: 23px;
-
-  /* 卡片与最大外框之间的距离，原来约 24px，现扩大一倍 */
   --group-padding-x: 48px;
   --group-padding-y: 26px;
-
-  /*
-   * 6 张 278px 卡片，加上 5 组横向间距和左右内边距后，
-   * 最大外框需要大于约 2034px。
-   */
   --outer-max-width: 2033px;
+  --layout-y-offset: -50px;
+  --bar-zero-width: 2px;
 }
 
-/* 最大外框居中 */
+/* 页面整体：外框水平、垂直居中，再整体向上 50px */
+html, body { min-height: 100%; }
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 #app {
   width: min(95%, var(--outer-max-width));
   margin: 0 auto;
+  transform: translateY(var(--layout-y-offset));
 }
 
-/* 分组最大外框 */
+/* 最大外框：由卡片网格决定宽度，同时保持居中 */
 .group {
+  position: relative;
   width: 100%;
   max-width: 100%;
   margin: 0 auto 28px;
   padding: var(--group-padding-y) var(--group-padding-x);
 }
 
-/* 默认每排 6 张卡片 */
+.group-title { padding-right: 90px; }
+
+/* 右上角登录 */
+.admin-link {
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  color: #168fe0;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
+  z-index: 2;
+}
+.admin-link:hover { color: #1188d2; text-decoration: underline; }
+
+/* 默认 6 列；JS 不再写死列数，后台变量可以直接接管 */
 .server-grid {
-  grid-template-columns: repeat(
-    var(--cards-per-row),
-    var(--card-width)
-  );
+  grid-template-columns: repeat(var(--cards-per-row), var(--card-width));
   gap: var(--card-row-gap) var(--card-column-gap);
   justify-content: center;
 }
 
-/* 卡片尺寸改为可配置 */
 .card {
   width: var(--card-width);
   min-width: var(--card-width);
   height: var(--card-height);
 }
 
-/*
- * CPU、内存、交换、硬盘字体与网速、流量一致。
- * 原来的 Classic 样式使用 11px，这里统一为 12px。
- */
-.metric-label {
-  color: #555 !important;
-  font-size: 12px !important;
-  font-weight: 400 !important;
+/* 四个资源条的百分比文字统一为浅蓝灰色 */
+.metric .bar-value {
+  color: #DAEAED !important;
 }
 
-/* 网速、流量图标 */
-.icon-down {
-  color: #1597e5;
+/* 0% 时保留极细蓝色起始点，保证所有条的视觉起点完全一致 */
+.bar-fill {
+  min-width: var(--bar-zero-width);
 }
 
-.icon-up {
-  color: #22a447;
+/* 系统图标由 app.js 调用程序自带 /os-icons/ 资源 */
+.os {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
+}
+.os img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
 }
 
-/* 负载图标 */
-.icon-load {
-  color: var(--danger);
-  font-size: 16px;
-  line-height: 1;
-}
-
-/* 响应式：桌面默认 6 个，窄屏自动减少卡片数量 */
+/* 6/5 列等自定义值在宽屏直接生效；窄屏再自动降列 */
 @media (max-width: 2000px) {
-  :root {
-    --cards-per-row: 5;
-  }
+  :root { --cards-per-row: 5; }
 }
-
 @media (max-width: 1650px) {
-  :root {
-    --cards-per-row: 4;
-  }
+  :root { --cards-per-row: 4; }
 }
-
 @media (max-width: 1360px) {
-  :root {
-    --cards-per-row: 3;
-  }
+  :root { --cards-per-row: 3; }
 }
-
 @media (max-width: 980px) {
   :root {
     --cards-per-row: 2;
     --group-padding-x: 24px;
-    --card-column-gap: 28px;
   }
+  #app { transform: none; }
 }
-
 @media (max-width: 620px) {
   :root {
     --cards-per-row: 1;
     --card-width: min(100%, 278px);
     --group-padding-x: 16px;
   }
-
-  .server-grid {
-    grid-template-columns: var(--card-width);
-  }
+  #app { transform: none; }
+  .server-grid { grid-template-columns: var(--card-width); }
 }
-
