@@ -327,19 +327,15 @@ function flagFallback(code) {
   }
 
   function formatLastReport(timestamp) {
-  const ts = Number(timestamp);
+    const ts = Number(timestamp);
+    if (!Number.isFinite(ts) || ts <= 0) return "未知";
+    const d = new Date(ts);
 
-  if (!Number.isFinite(ts) || ts <= 0) {
-    return "未知";
+    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} `
+         + `${String(d.getHours()).padStart(2, "0")}:`
+         + `${String(d.getMinutes()).padStart(2, "0")}:`
+         + `${String(d.getSeconds()).padStart(2, "0")}`;
   }
-
-  const d = new Date(ts);
-
-  const pad = n => String(n).padStart(2, "0");
-
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} `
-       + `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
 
   async function load() {
     if (state.demo) {
