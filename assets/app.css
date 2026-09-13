@@ -569,6 +569,28 @@ body {
   display: block;
 }
 
+/* 6/5 按卡片数量自动最大外框 */
+@media (max-width: 2098px) {
+  :root {
+    --cards-per-row: 6;
+    --group-width: 2098px;
+  }
+}
+
+@media (max-width: 1766px) {
+  :root {
+    --cards-per-row: 5;
+    --group-width: 1766px;
+  }
+}
+
+@media (max-width: 1432px) {
+  :root {
+    --cards-per-row: 4;
+    --group-width: 1432%;
+  }
+}
+
 /* 6/5 列等自定义值在宽屏直接生效；窄屏再自动降列 */
 @media (max-width: 1939px) {
   :root { --cards-per-row: 5; }
