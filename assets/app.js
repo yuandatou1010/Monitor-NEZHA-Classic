@@ -94,7 +94,7 @@ function flagFallback(code) {
     const m = Math.floor(seconds % 3600 / 60);
     const s = seconds % 60;
     if (days > 0) return `${days} 天`;
-    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   }
 
   function online(server) {
