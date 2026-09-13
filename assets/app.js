@@ -86,7 +86,7 @@ function flagFallback(code) {
   }
 
   function uptime(boot, lastUpdated, isOnline) {
-    const t = num(boot);
+    const start = num(boot);
     if (!start) return "00:00:00";
     const end = isOnline ? Date.now() : num(lastUpdated, start);
     const seconds = Math.max(0, Math.floor((Date.now() - t) / 1000));
