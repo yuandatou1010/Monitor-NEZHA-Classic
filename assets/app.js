@@ -85,9 +85,10 @@ function flagFallback(code) {
     }).join(" | ");
   }
 
-  function uptime(boot) {
+  function uptime(boot, lastUpdated, isOnline) {
     const t = num(boot);
     if (!t) return "00:00:00";
+    const end = isOnline ? Date.now() : num(lastUpdated, start);
     const seconds = Math.max(0, Math.floor((Date.now() - t) / 1000));
     const days = Math.floor(seconds / 86400);
     const h = Math.floor(seconds % 86400 / 3600);
