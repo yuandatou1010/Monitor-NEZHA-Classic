@@ -1,9 +1,14 @@
 # NEZHA Classic for CF-Server-Monitor
 
 这是一个针对 `CF-Server-Monitor` 的第三方主题，视觉目标为 **NEZHA V0 Classic** 风格。
+以简约和一览无遗的方式呈现页面，打开探针即纵观一切，推荐1-18台服务器数量使用。
 
+可以1-6台服务器为一排，最佳显示方案为两排
+如需显示三排，则需修改卡片高度，否则无法直接纵观（无需求者略过即可）
 ## 显示内容
 
+左上角 绿色代表WSS已连接 黄色代表连接中 红色代表已断开
+右上角 四叶草图标点击进入管理页面。
 每台服务器只显示：
 
 - 国家/地区旗帜
@@ -16,7 +21,7 @@
 - 网速
 - 总流量
 - CPU 核心 / 内存 / 磁盘容量
-- Load Average
+- 服务器负载
 - 在线时间
 - 右上角信息按钮
 
@@ -52,15 +57,15 @@ https://github.com/你的用户名/你的主题仓库/tree/main
 
 建议使用固定 commit 地址，以避免主题被意外修改。
 
-## 本地预览
+## 常用修改
 
-直接打开：
-
-```text
-index.html?demo=1
-```
-
-即可看到模拟数据。
+<style>
+:root {
+  --outer-max-width: 1888px !important;  //外框宽度
+  --cards-per-row: 6;      //每排卡片数量
+  --card-width: 278px;     // 卡片宽度
+  --card-height: 333px;    // 卡片高度
+</style>
 
 ## 注意
 
@@ -70,4 +75,4 @@ index.html?demo=1
 
 ## 当前版本
 
-v0.1.0
+v0.8.0
