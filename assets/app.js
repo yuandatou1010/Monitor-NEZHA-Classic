@@ -60,9 +60,9 @@ function flagFallback(code) {
 
   function capacity(mb) {
     const n = Math.max(0, num(mb));
-    if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)}TB`;
-    if (n >= 1024) return `${(n / 1024).toFixed(n >= 10240 ? 0 : 1)}GB`;
-    return `${Math.round(n)}MB`;
+    if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} TB`;
+    if (n >= 1024) return `${(n / 1024).toFixed(n >= 10240 ? 0 : 1)} GB`;
+    return `${Math.round(n)} MB`;
   }
 
   function percent(used, total) {
@@ -87,7 +87,7 @@ function flagFallback(code) {
 
   function uptime(boot) {
     const t = num(boot);
-    if (!t) return "0:00:00";
+    if (!t) return "00:00:00";
     const seconds = Math.max(0, Math.floor((Date.now() - t) / 1000));
     const days = Math.floor(seconds / 86400);
     const h = Math.floor(seconds % 86400 / 3600);
@@ -183,16 +183,16 @@ function flagFallback(code) {
           <div class="text-row">
             <span class="text-label">网速</span>
             <span class="text-value">
-              <span class="icon-down">⤵</span>${speed(server.net_in_speed)}
-              <span class="icon-up">⤴</span>${speed(server.net_out_speed)}
+              <span class="icon-down">⤵</span>${speed(server.net_in_speed)} 
+              <span class="icon-up">⤴</span>${speed(server.net_out_speed)} 
             </span>
           </div>
 
           <div class="text-row">
             <span class="text-label">流量</span>
             <span class="text-value">
-              <span class="icon-down">⇊</span>${bytes(server.net_rx)}
-              <span class="icon-up">ㅤ⇈</span>${bytes(server.net_tx)}
+              <span class="icon-down">⇊</span>${bytes(server.net_rx)}  
+              <span class="icon-up">ㅤ⇈</span>${bytes(server.net_tx)}  
             </span>
           </div>
 
@@ -200,7 +200,7 @@ function flagFallback(code) {
             <span class="text-label">信息</span>
             <span class="text-value">
               <span class="icon-cpu">❆</span>${num(server.cpu_cores)}Core
-              <span class="icon-ram">▂</span>${capacity(server.ram_total)} 
+              <span class="icon-ram">⩨</span>${capacity(server.ram_total)} 
               <span class="icon-disk">▤</span>${capacity(server.disk_total)} 
             </span>
           </div>
@@ -208,7 +208,7 @@ function flagFallback(code) {
           <div class="text-row">
             <span class="text-label">负载</span>
             <span class="text-value">
-              <span class="icon-load">⌥</span>${esc(fmtLoad(server.load_avg))}
+              <span class="icon-load">༄</span>${esc(fmtLoad(server.load_avg))}
             </span>
           </div>
 
@@ -369,8 +369,8 @@ function flagFallback(code) {
       const rows = el.querySelectorAll('.text-row');
       if (rows[0]) rows[0].querySelector('.text-value').innerHTML = `<span class="icon-down">⤵</span>${speed(s.net_in_speed)} <span class="icon-up">⤴</span>${speed(s.net_out_speed)}`;
       if (rows[1]) rows[1].querySelector('.text-value').innerHTML = `<span class="icon-down">⇊</span>${bytes(s.net_rx)} <span class="icon-up">⇈</span>${bytes(s.net_tx)}`;
-      if (rows[2]) rows[2].querySelector('.text-value').innerHTML = `<span class="icon-cpu">❆</span>${num(s.cpu_cores)}Core <span class="icon-ram">𓄲♒</span>${capacity(s.ram_total)}  <span class="icon-disk">▤</span>${capacity(s.disk_total)} `;
-      if (rows[3]) rows[3].querySelector('.text-value').innerHTML = `<span class="icon-load">⌥♒</span>${esc(fmtLoad(s.load_avg))}`;
+      if (rows[2]) rows[2].querySelector('.text-value').innerHTML = `<span class="icon-cpu">❆</span>${num(s.cpu_cores)}Core <span class="icon-ram">⩨</span>${capacity(s.ram_total)}  <span class="icon-disk">▤</span>${capacity(s.disk_total)} `;
+      if (rows[3]) rows[3].querySelector('.text-value').innerHTML = `<span class="icon-load">༄</span>${esc(fmtLoad(s.load_avg))}`;
       if (rows[4]) rows[4].querySelector('.text-value').innerHTML = `<span class="status-dot ${offline ? 'offline' : ''}"></span>${uptime(s.boot_time)}`;
       const name = el.querySelector('.name');
       if (name) { name.textContent = `${s.name || 'Unnamed'}${offline ? '[已离线]' : ''}`; name.title = s.name || ''; }
