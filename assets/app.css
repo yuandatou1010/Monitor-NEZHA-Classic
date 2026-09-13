@@ -481,19 +481,20 @@ body {
   align-items: center;
   justify-content: center;
 }
+
 #app[data-columns="6"] {
   --cards-per-row: 6;
-  --outer-max-width: 1933px;
+  --outer-max-width: 90%;
 }
 
 #app[data-columns="5"] {
   --cards-per-row: 5;
-  --outer-max-width: 1600px;
+  --outer-max-width: 80%;
 }
 
 #app[data-columns="4"] {
   --cards-per-row: 4;
-  --outer-max-width: 1277px;
+  --outer-max-width: 70%;
 }
 #app {
   width: min(100%, var(--outer-max-width));
@@ -505,7 +506,7 @@ body {
 .group {
   position: relative;
   width: 100%;
-  max-width: none;
+  max-width: 100%;
   margin: 0 auto 28px;
   padding: var(--group-padding-y) var(--group-padding-x);
 }
