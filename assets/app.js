@@ -509,32 +509,5 @@ function connectWS() {
     } catch (_) {}
   };
 }
-
-  function demoData() {
-    const now = Date.now();
-    const mk = (id, name, region, cpu, ram, disk, days) => ({
-      id, name, region, server_group: "other",
-      cpu, ram_total: 1024, ram_used: 1024 * ram / 100,
-      swap_total: 0, swap_used: 0,
-      disk_total: 40960, disk_used: 40960 * disk / 100,
-      net_in_speed: 3580, net_out_speed: 3670,
-      net_rx: 440.51 * 1024 ** 2, net_tx: 432.88 * 1024 ** 2,
-      cpu_cores: 2, load_avg: "0.03 0.01 0.00",
-      boot_time: now - days * 86400000, last_updated: now
-    });
-    return [
-      mk("1", "香港-0", "HK", 0, 14, 17, 0.27),
-      mk("2", "香港-1", "HK", 0, 0, 0, 0.1),
-      mk("3", "香港-2", "HK", 0, 0, 0, 0.1),
-      mk("4", "香港-3", "HK", 1, 14, 16, 10),
-      mk("5", "美国", "US", 7, 67, 16, 312),
-      mk("6", "香港-A", "HK", 2, 29, 47, 55),
-      mk("7", "香港-B", "HK", 0, 26, 40, 55),
-      mk("8", "台湾-A", "TW", 3, 21, 29, 404),
-      mk("9", "台湾-B", "TW", 0, 23, 29, 18),
-      mk("10", "新加坡", "SG", 3, 78, 58, 118)
-    ];
-  }
-
   load();
 })();
