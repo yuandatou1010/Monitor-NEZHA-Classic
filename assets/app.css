@@ -481,6 +481,20 @@ body {
   align-items: center;
   justify-content: center;
 }
+#app[data-columns="6"] {
+  --cards-per-row: 6;
+  --outer-max-width: 1933px;
+}
+
+#app[data-columns="5"] {
+  --cards-per-row: 5;
+  --outer-max-width: 1600px;
+}
+
+#app[data-columns="4"] {
+  --cards-per-row: 4;
+  --outer-max-width: 1277px;
+}
 #app {
   width: min(100%, var(--outer-max-width));
   margin: 0 auto;
@@ -491,7 +505,7 @@ body {
 .group {
   position: relative;
   width: 100%;
-  max-width: 100%;
+  max-width: none;
   margin: 0 auto 28px;
   padding: var(--group-padding-y) var(--group-padding-x);
 }
@@ -568,25 +582,6 @@ body {
   object-fit: contain;
   display: block;
 }
-
-/* 6/5 按卡片数量自动最大外框 */
-/* 默认：6 列 */
-:root {
-  --cards-per-row: 6;
-  --group-max-width: 1933px;
-}
-
-/* 5 列 */
-  :root {
-    --cards-per-row: 5;
-    --group-max-width: 1600px;
-  }
-
-/* 4 列 */
-  :root {
-    --cards-per-row: 4;
-    --group-max-width: 1277px;
-  }
 
 /* 6/5 列等自定义值在宽屏直接生效；窄屏再自动降列 */
 @media (max-width: 1939px) {
