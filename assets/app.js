@@ -384,7 +384,7 @@ function flagFallback(code) {
       if (rows[1]) rows[1].querySelector('.text-value').innerHTML = `<span class="icon-down">⇊</span>${bytes(s.net_rx)}  <span class="icon-up">⇈</span>${bytes(s.net_tx)}`;
       if (rows[2]) rows[2].querySelector('.text-value').innerHTML = `<span class="icon-cpu">❆</span>${num(s.cpu_cores)}Core <span class="icon-ram">▥</span>${capacity(s.ram_total)}  <span class="icon-disk">▤</span>${capacity(s.disk_total)} `;
       if (rows[3]) rows[3].querySelector('.text-value').innerHTML = `<span class="icon-load">𓂃</span>${esc(fmtLoad(s.load_avg))}`;
-      if (rows[4]) rows[4].querySelector('.text-value').innerHTML = `<span class="status-dot ${offline ? 'offline' : ''}"></span>${uptime(s.boot_time)}`;
+      if (rows[4]) rows[4].querySelector('.text-value').innerHTML = `<span class="status-dot ${offline ? 'offline' : ''}"></span>${uptime(s.boot_time, s.last_updated, !offline)}`;
       const name = el.querySelector('.name');
       if (name) { name.textContent = `${s.name || 'Unnamed'}${offline ? '[已离线]' : ''}`; name.title = s.name || ''; }
       const info = el.querySelector('.info');
