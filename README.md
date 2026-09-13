@@ -66,9 +66,8 @@ https://github.com/你的用户名/你的主题仓库/tree/main
 </style>
 ```
 ## 注意
-
+遇到缓存无法查看最新 可尝试CTRL+F5强制刷新
 第一版假定 CF-Server-Monitor 前台和主题使用同域部署。
-
 如果你的站点启用了 Turnstile，主题需要继续接入项目现有的 Turnstile 验证流程；如果站点是公开站点且没有 Turnstile，则可以直接工作。
 
 ## 当前版本
