@@ -215,7 +215,7 @@ function flagFallback(code) {
           <div class="text-row">
             <span class="text-label">在线</span>
             <span class="text-value">
-              <span class="status-dot ${offline ? "offline" : ""}"></span>${uptime(server.boot_time)}
+              <span class="status-dot ${offline ? "offline" : ""}"></span>${uptime(server.boot_time, server.last_updated, online(server))}
             </span>
           </div>
         </div>
