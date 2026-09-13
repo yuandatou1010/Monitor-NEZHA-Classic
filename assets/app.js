@@ -303,6 +303,8 @@ function flagFallback(code) {
       ["进程数", num(s.processes)],
       ["连接数", `TCP ${num(s.tcp_conn)} / UDP ${num(s.udp_conn)}`],
       ["启动", formatStartTime(s.boot_time)],
+      ["活动", `${formatLastReport(server.last_updated)}`],
+      ["版本", `${server.agent_version || "未知"}`],
     ].map(([k, v]) => `<span>${esc(k)}: ${esc(v)}</span>`).join("");
     const btn = document.querySelector(`[data-info="${CSS.escape(String(s.id))}"]`);
     if (btn) {
@@ -323,6 +325,21 @@ function flagFallback(code) {
     if (!current || !data) return;
     state.serverMap.set(id, Object.assign({}, current, data, { id }));
   }
+
+  function formatLastReport(timestamp) {
+  const ts = Number(timestamp);
+
+  if (!Number.isFinite(ts) || ts <= 0) {
+    return "未知";
+  }
+
+  const d = new Date(ts);
+
+  const pad = n => String(n).padStart(2, "0");
+
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} `
+       + `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
 
   async function load() {
     if (state.demo) {
