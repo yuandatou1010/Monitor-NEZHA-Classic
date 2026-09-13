@@ -573,30 +573,30 @@ body {
 /* 默认：6 列 */
 :root {
   --cards-per-row: 6;
-  --group-max-width: 2133px;
+  --group-max-width: 1933px;
 }
 
 /* 5 列 */
   :root {
     --cards-per-row: 5;
-    --group-max-width: 1866px;
+    --group-max-width: 1600px;
   }
 
 /* 4 列 */
   :root {
     --cards-per-row: 4;
-    --group-max-width: 1533px;
+    --group-max-width: 1277px;
   }
 
 /* 6/5 列等自定义值在宽屏直接生效；窄屏再自动降列 */
 @media (max-width: 1939px) {
-  :root { --cards-per-row: 5; }
+  :root { --cards-per-row: 6; }
 }
 @media (max-width: 1650px) {
-  :root { --cards-per-row: 4; }
+  :root { --cards-per-row: 5; }
 }
 @media (max-width: 1360px) {
-  :root { --cards-per-row: 3; }
+  :root { --cards-per-row: 4; }
 }
 @media (max-width: 980px) {
   :root {
