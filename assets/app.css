@@ -619,16 +619,16 @@ body {
   height: 12px;
   border-radius: 50%;
 
-  background: #147310;
-  transition: background-color 0.2s ease;
+  background: #E6DA8E;
+  transition: background-color 0.3s ease;
 }
 
 /* WSS 已连接 */
 .ws-status.connected span {
-  background: #0DAD00;
+  background: #8EE691;
 }
 
 /* WSS 已断开 */
 .ws-status.disconnected span {
-  background: #A0ADA0;
+  background: #E68E8E;
 }
