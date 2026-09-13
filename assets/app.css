@@ -468,7 +468,7 @@ body{background:#fff;}
   --card-row-gap: 23px;
   --group-padding-x: 28px;
   --group-padding-y: 28px;
-  --outer-max-width: 2002px;
+  --outer-max-width: 1988px;
   --layout-y-offset: -5px;
   --bar-zero-width: 30px;
 }
@@ -570,6 +570,9 @@ body {
 }
 
 /* 6/5 列等自定义值在宽屏直接生效；窄屏再自动降列 */
+@media (max-width: 1939px) {
+  :root { --cards-per-row: 5; }
+}
 @media (max-width: 1650px) {
   :root { --cards-per-row: 4; }
 }
