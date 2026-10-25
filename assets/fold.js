@@ -276,7 +276,7 @@
 
     button.dataset.cfFoldKey = keyword;
 
-    const text = `[${count}]台已折叠»>`;
+    const text = `${count}台已折叠»>`;
 
     // 内容没变化就不重写。
     if (button.textContent !== text) {
