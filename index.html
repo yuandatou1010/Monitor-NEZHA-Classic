@@ -10,16 +10,11 @@
 
   <style>
     /*
-     * 使用 visibility，不使用 display:none，
-     * 保留探针真实布局，方便读取卡片位置。
+     * 保留真实布局，只隐藏内容。
+     * 不使用 display:none，确保能读取卡片尺寸。
      */
     html.probe-intro-running #app {
       visibility: hidden;
-    }
-
-    html.probe-intro-joining #app {
-      visibility: visible;
-      animation: probe-content-join 300ms ease both;
     }
 
     #probe-intro {
@@ -27,21 +22,19 @@
       inset: 0;
       z-index: 9999;
       overflow: hidden;
-      pointer-events: none;
       background: #fff;
+      pointer-events: none;
     }
 
     #probe-intro svg {
       display: block;
       width: 100%;
       height: 100%;
-      overflow: visible;
     }
 
-    /* 正在描绘的边框 */
     #probe-intro .intro-outline {
       fill: none;
-      stroke: #b9c9d3;
+      stroke: var(--intro-line-color, #bac8d0);
       stroke-width: 1;
       vector-effect: non-scaling-stroke;
       stroke-linecap: round;
@@ -51,64 +44,16 @@
       stroke-dashoffset: 1;
 
       animation:
-        probe-outline-draw
+        probe-draw
         var(--draw-duration)
-        cubic-bezier(.35, 0, .2, 1)
+        linear
         var(--draw-delay)
         both;
     }
 
-    #probe-intro .intro-group-outline {
-      stroke: #c8d0d5;
-    }
-
-    /* 卡片顶部分隔线，稍微增加原模板的辨识度 */
-    #probe-intro .intro-header-line {
-      stroke: #dbe2e6;
-    }
-
-    /* 最后 0.3 秒：错开的线条归位 */
-    #probe-intro .intro-piece {
-      transform: translate(
-        var(--piece-x, 0px),
-        var(--piece-y, 0px)
-      );
-
-      transition: transform 300ms cubic-bezier(.2, .8, .2, 1);
-    }
-
-    #probe-intro.is-joining {
-      background: transparent;
-      opacity: 0;
-      transition: opacity 300ms ease;
-    }
-
-    #probe-intro.is-joining .intro-piece {
-      transform: translate(0, 0);
-    }
-
-    @keyframes probe-outline-draw {
-      from {
-        stroke-dashoffset: 1;
-        opacity: .45;
-      }
-
-      to {
-        stroke-dashoffset: 0;
-        opacity: 1;
-      }
-    }
-
-    @keyframes probe-content-join {
-      from {
-        opacity: 0;
-        filter: blur(1.5px);
-      }
-
-      to {
-        opacity: 1;
-        filter: blur(0);
-      }
+    @keyframes probe-draw {
+      from { stroke-dashoffset: 1; }
+      to   { stroke-dashoffset: 0; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -116,21 +61,8 @@
         animation: none;
         stroke-dashoffset: 0;
       }
-
-      #probe-intro .intro-piece {
-        transform: none;
-        transition: none;
-      }
-
-      html.probe-intro-joining #app {
-        animation: none;
-      }
     }
   </style>
-
-  <script>
-    document.documentElement.classList.add("probe-intro-running");
-  </script>
 </head>
 
 <body>
@@ -144,22 +76,28 @@
     (() => {
       "use strict";
 
-      /* ================= 配置区 ================= */
+      /* ================= 动画配置区 ================= */
 
       const CONFIG = {
-        // 整体约 3 秒，最后 0.3 秒用于归位融合。
-        totalDuration: 3000,
-        joinDuration: 300,
+        // 整体展示时间：3000 = 3 秒。
+        duration: 3000,
 
-        /*
-         * 最多等待真实卡片布局多久。
-         * 超时后按原 CSS 变量画示意布局，不请求接口。
-         */
-        layoutWait: 350,
+        // 布局检查间隔，不产生网络请求。
+        checkInterval: 100,
 
-        // 线条绘制前的小幅错位，最后归位产生“粘合”感。
-        pieceOffset: 5
+        // 是否绘制卡片名称下方的分隔线。
+        drawHeaderLine: true,
+
+        // 描线颜色。
+        groupColor: "#c5cdd2",
+        cardColor: "#b6c6d0",
+        headerColor: "#dce3e7"
       };
+
+      /*
+       * 外框尺寸、卡片宽高、列数、间距、卡片数量：
+       * 全部读取页面实际布局，不需要在这里重复配置。
+       */
 
       /* =============== 配置区结束 =============== */
 
@@ -167,51 +105,26 @@
       const app = document.getElementById("app");
       const overlay = document.getElementById("probe-intro");
       const svg = overlay.querySelector("svg");
-
       const NS = "http://www.w3.org/2000/svg";
-      const startedAt = performance.now();
 
-      let built = false;
-      let observer;
-      let layoutTimer;
-      let joinTimer;
+      let startedAt = 0;
+      let signature = "";
+      let intervalId;
       let endTimer;
-      let frame;
-
-      const reducedMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)"
-      ).matches;
+      let stopped = false;
 
       function cleanup() {
-        observer?.disconnect();
-        clearTimeout(layoutTimer);
-        clearTimeout(joinTimer);
+        if (stopped) return;
+        stopped = true;
+
+        clearInterval(intervalId);
         clearTimeout(endTimer);
-        cancelAnimationFrame(frame);
 
-        root.classList.remove(
-          "probe-intro-running",
-          "probe-intro-joining"
-        );
-
+        root.classList.remove("probe-intro-running");
         overlay.remove();
       }
 
-      function cssNumber(style, name, fallback) {
-        const value = parseFloat(style.getPropertyValue(name));
-        return Number.isFinite(value) ? value : fallback;
-      }
-
-      function box(rect) {
-        return {
-          x: rect.left,
-          y: rect.top,
-          width: rect.width,
-          height: rect.height
-        };
-      }
-
-      function visible(rect) {
+      function isVisible(rect) {
         return (
           rect.width > 0 &&
           rect.height > 0 &&
@@ -222,17 +135,30 @@
         );
       }
 
-      /*
-       * 读取实际布局。
-       * visibility:hidden 不影响 getBoundingClientRect()。
-       */
-      function readActualLayout() {
+      function readBox(element) {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+
+        return {
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height,
+          radius: parseFloat(style.borderTopLeftRadius) || 0
+        };
+      }
+
+      function readLayout() {
+        /*
+         * 排除被 fold.js 隐藏的机器。
+         * visibility:hidden 是我们设置的，不影响尺寸读取。
+         */
         const cards = Array.from(
           app.querySelectorAll(".card[data-id]")
         ).filter(card => {
           return (
             getComputedStyle(card).display !== "none" &&
-            visible(card.getBoundingClientRect())
+            isVisible(card.getBoundingClientRect())
           );
         });
 
@@ -240,285 +166,202 @@
 
         const groups = Array.from(
           app.querySelectorAll(".group")
-        ).filter(group => visible(group.getBoundingClientRect()));
+        ).filter(group => {
+          return (
+            getComputedStyle(group).display !== "none" &&
+            isVisible(group.getBoundingClientRect())
+          );
+        });
 
         return {
-          groups: groups.map(group => box(
-            group.getBoundingClientRect()
-          )),
+          viewport: [window.innerWidth, window.innerHeight],
+
+          groups: groups.map(readBox),
 
           cards: cards.map(card => {
-            const rect = card.getBoundingClientRect();
+            const result = readBox(card);
             const header = card.querySelector(".card-head");
 
-            return {
-              ...box(rect),
-              headerY: header
-                ? header.getBoundingClientRect().bottom - rect.top
-                : 45,
-              padding: parseFloat(
-                getComputedStyle(card).paddingLeft
-              ) || 17
-            };
+            if (header && CONFIG.drawHeaderLine) {
+              const rect = header.getBoundingClientRect();
+
+              result.header = {
+                x1: rect.left,
+                x2: rect.right,
+                y: rect.bottom
+              };
+            }
+
+            return result;
           })
         };
       }
 
-      /*
-       * 接口较慢时，按原 CSS 的尺寸与间距绘制一行示意框。
-       * 此处仅做视觉展示，不代表真实服务器数量。
-       */
-      function fallbackLayout() {
-        const style = getComputedStyle(root);
-        const bodyStyle = getComputedStyle(document.body);
-
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-
-        const cardWidth = cssNumber(style, "--card-width", 278);
-        const cardHeight = cssNumber(style, "--card-height", 333);
-        const gap = cssNumber(style, "--card-column-gap", 27);
-        const paddingX = cssNumber(style, "--group-padding-x", 28);
-        const paddingY = cssNumber(style, "--group-padding-y", 28);
-
-        const bodyLeft = parseFloat(bodyStyle.paddingLeft) || 0;
-        const bodyRight = parseFloat(bodyStyle.paddingRight) || 0;
-
-        const maxWidth = cssNumber(
-          style,
-          "--outer-max-width",
-          1988
-        );
-
-        const groupWidth = Math.max(
-          1,
-          Math.min(width - bodyLeft - bodyRight, maxWidth)
-        );
-
-        const desiredColumns = Math.max(
-          1,
-          Math.floor(cssNumber(style, "--cards-per-row", 6))
-        );
-
-        const available = Math.max(1, groupWidth - paddingX * 2);
-
-        const columns = Math.max(1, Math.min(
-          desiredColumns,
-          Math.floor((available + gap) / (cardWidth + gap))
-        ));
-
-        const gridWidth =
-          columns * cardWidth + (columns - 1) * gap;
-
-        const groupHeight = cardHeight + paddingY * 2;
-
-        const offset = cssNumber(style, "--layout-y-offset", -5);
-
-        const groupX = (width - groupWidth) / 2;
-        const groupY = Math.max(
-          10,
-          (height - groupHeight) / 2 - 14 + offset
-        );
-
-        const startX = groupX + (groupWidth - gridWidth) / 2;
-        const startY = groupY + paddingY;
-
-        return {
-          groups: [{
-            x: groupX,
-            y: groupY,
-            width: groupWidth,
-            height: groupHeight
-          }],
-
-          cards: Array.from({ length: columns }, (_, index) => ({
-            x: startX + index * (cardWidth + gap),
-            y: startY,
-            width: cardWidth,
-            height: cardHeight,
-            headerY: 45,
-            padding: 17
-          }))
-        };
-      }
-
-      function makeOutline(parent, tag, attrs, type, delay, duration) {
+      function addOutline(
+        fragment,
+        tag,
+        attributes,
+        color,
+        start,
+        duration,
+        elapsed
+      ) {
         const element = document.createElementNS(NS, tag);
 
-        for (const [name, value] of Object.entries(attrs)) {
+        for (const [name, value] of Object.entries(attributes)) {
           element.setAttribute(name, value);
         }
 
+        element.setAttribute("class", "intro-outline");
         element.setAttribute("pathLength", "1");
-        element.setAttribute(
-          "class",
-          `intro-outline ${type || ""}`
-        );
 
-        element.style.setProperty("--draw-delay", `${delay}ms`);
+        element.style.setProperty("--intro-line-color", color);
         element.style.setProperty("--draw-duration", `${duration}ms`);
 
-        parent.appendChild(element);
-        return element;
-      }
-
-      function makePiece(index) {
-        const piece = document.createElementNS(NS, "g");
-        piece.setAttribute("class", "intro-piece");
-
-        const direction = index % 2 === 0 ? -1 : 1;
-
-        piece.style.setProperty(
-          "--piece-x",
-          `${direction * CONFIG.pieceOffset}px`
-        );
-
-        piece.style.setProperty(
-          "--piece-y",
-          `${-direction * CONFIG.pieceOffset * .6}px`
-        );
-
-        svg.appendChild(piece);
-        return piece;
-      }
-
-      function build(layout) {
-        if (built) return;
-        built = true;
-
-        observer?.disconnect();
-        clearTimeout(layoutTimer);
-
-        svg.setAttribute(
-          "viewBox",
-          `0 0 ${window.innerWidth} ${window.innerHeight}`
-        );
-
-        const elapsed = performance.now() - startedAt;
-
-        const remaining = Math.max(
-          300,
-          CONFIG.totalDuration - CONFIG.joinDuration - elapsed
-        );
-
-        // 大外框从左上角开始描绘。
-        layout.groups.forEach((rect, index) => {
-          const piece = makePiece(index);
-
-          makeOutline(
-            piece,
-            "rect",
-            {
-              x: rect.x,
-              y: rect.y,
-              width: rect.width,
-              height: rect.height,
-              rx: 2
-            },
-            "intro-group-outline",
-            0,
-            remaining
-          );
-        });
-
         /*
-         * 小卡片按从左到右的顺序开始描绘。
-         * 同列卡片再按从上到下排序。
+         * 布局变化后仍沿用同一条时间轴，
+         * 不会每次校正都重新从头画。
          */
-        const cards = [...layout.cards].sort((a, b) => {
-          return a.x - b.x || a.y - b.y;
-        });
+        element.style.setProperty(
+          "--draw-delay",
+          `${start - elapsed}ms`
+        );
 
-        cards.forEach((rect, index) => {
-          const progress = cards.length > 1
-            ? index / (cards.length - 1)
-            : 0;
-
-          const delay = progress * remaining * .52;
-          const duration = remaining - delay;
-
-          const piece = makePiece(index + 1);
-
-          makeOutline(
-            piece,
-            "rect",
-            {
-              x: rect.x,
-              y: rect.y,
-              width: rect.width,
-              height: rect.height,
-              rx: 5
-            },
-            "",
-            delay,
-            duration
-          );
-
-          makeOutline(
-            piece,
-            "line",
-            {
-              x1: rect.x + rect.padding,
-              y1: rect.y + rect.headerY,
-              x2: rect.x + rect.width - rect.padding,
-              y2: rect.y + rect.headerY
-            },
-            "intro-header-line",
-            delay + duration * .35,
-            duration * .65
-          );
-        });
+        fragment.appendChild(element);
       }
 
-      function queueActualLayout() {
-        if (built) return;
+      function update() {
+        if (stopped) return;
 
-        cancelAnimationFrame(frame);
+        try {
+          const layout = readLayout();
 
-        frame = requestAnimationFrame(() => {
-          try {
-            const layout = readActualLayout();
-            if (layout) build(layout);
-          } catch (error) {
-            cleanup();
+          // 数据尚未返回时，不画虚假的一行卡片。
+          if (!layout) {
+            if (signature) {
+              svg.replaceChildren();
+              signature = "";
+            }
+            return;
           }
-        });
+
+          /*
+           * 将坐标精度限制到 0.1px，
+           * 避免无意义的小数变化导致重复绘制。
+           */
+          const nextSignature = JSON.stringify(
+            layout,
+            (key, value) => {
+              return typeof value === "number"
+                ? Math.round(value * 10) / 10
+                : value;
+            }
+          );
+
+          if (nextSignature === signature) return;
+          signature = nextSignature;
+
+          const elapsed = performance.now() - startedAt;
+          const drawTime = Math.max(1, CONFIG.duration - 100);
+          const fragment = document.createDocumentFragment();
+
+          svg.setAttribute(
+            "viewBox",
+            `0 0 ${window.innerWidth} ${window.innerHeight}`
+          );
+
+          // 外框与卡片共同描绘，结束前留 100ms 完整展示。
+          for (const rect of layout.groups) {
+            addOutline(
+              fragment,
+              "rect",
+              {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+                rx: rect.radius
+              },
+              CONFIG.groupColor,
+              0,
+              drawTime,
+              elapsed
+            );
+          }
+
+          /*
+           * 按横向位置决定开始时间：
+           * 同一列同时开始，左侧早于右侧。
+           */
+          const minX = Math.min(...layout.cards.map(card => card.x));
+          const maxX = Math.max(...layout.cards.map(card => card.x));
+          const range = maxX - minX;
+
+          for (const card of layout.cards) {
+            const progress = range > 0
+              ? (card.x - minX) / range
+              : 0;
+
+            const start = progress * drawTime * 0.5;
+            const duration = drawTime - start;
+
+            addOutline(
+              fragment,
+              "rect",
+              {
+                x: card.x,
+                y: card.y,
+                width: card.width,
+                height: card.height,
+                rx: card.radius
+              },
+              CONFIG.cardColor,
+              start,
+              duration,
+              elapsed
+            );
+
+            if (card.header) {
+              addOutline(
+                fragment,
+                "line",
+                {
+                  x1: card.header.x1,
+                  y1: card.header.y,
+                  x2: card.header.x2,
+                  y2: card.header.y
+                },
+                CONFIG.headerColor,
+                start + duration * 0.35,
+                duration * 0.65,
+                elapsed
+              );
+            }
+          }
+
+          svg.replaceChildren(fragment);
+        } catch (error) {
+          cleanup();
+          console.warn("[线框开场] 已跳过：", error);
+        }
       }
 
       try {
-        observer = new MutationObserver(queueActualLayout);
+        root.classList.add("probe-intro-running");
+        startedAt = performance.now();
 
-        observer.observe(app, {
-          childList: true,
-          subtree: true
-        });
+        update();
 
-        queueActualLayout();
+        // 只检查页面布局，不访问任何接口。
+        intervalId = setInterval(
+          update,
+          CONFIG.checkInterval
+        );
 
-        layoutTimer = setTimeout(() => {
-          try {
-            build(readActualLayout() || fallbackLayout());
-          } catch (error) {
-            cleanup();
-          }
-        }, CONFIG.layoutWait);
-
-        const totalDuration = reducedMotion
-          ? 700
-          : CONFIG.totalDuration;
-
-        joinTimer = setTimeout(() => {
-          root.classList.add("probe-intro-joining");
-          overlay.classList.add("is-joining");
-        }, totalDuration - CONFIG.joinDuration);
-
-        endTimer = setTimeout(cleanup, totalDuration);
-
-        // 动画期间改变窗口大小时，直接结束，避免轮廓错位。
-        window.addEventListener("resize", cleanup, { once: true });
+        // 到时直接显示真实探针，不做粘合或移动效果。
+        endTimer = setTimeout(cleanup, CONFIG.duration);
       } catch (error) {
         cleanup();
-        console.warn("[线框开场] 已跳过：", error);
       }
     })();
   </script>
