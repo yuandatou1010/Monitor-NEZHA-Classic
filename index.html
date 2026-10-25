@@ -80,7 +80,7 @@
 
       const CONFIG = {
         // 整体展示时间：3000 = 3 秒。
-        duration: 3000,
+        duration: 2500,
 
         // 布局检查间隔，不产生网络请求。
         checkInterval: 100,
@@ -295,14 +295,28 @@
            */
           const minX = Math.min(...layout.cards.map(card => card.x));
           const maxX = Math.max(...layout.cards.map(card => card.x));
-          const range = maxX - minX;
 
+          const centerX = (minX + maxX) / 2;
+          const halfRange = (maxX - minX) / 2;
+          
           for (const card of layout.cards) {
-            const progress = range > 0
-              ? (card.x - minX) / range
+            /*
+             * 两侧 progress 为 0，最先开始；
+             * 越靠近中间 progress 越大，稍后开始。
+             * 同一列的上下卡片同步描绘。
+             */
+            const progress = halfRange > 0
+              ? Math.max(
+                  0,
+                  Math.min(
+                    1,
+                    1 - Math.abs(card.x - centerX) / halfRange
+                  )
+                )
               : 0;
 
-            const start = progress * drawTime * 0.5;
+            // 减小开始时间差，让视觉更平缓。
+            const start = progress * drawTime * 0.3;
             const duration = drawTime - start;
 
             addOutline(
