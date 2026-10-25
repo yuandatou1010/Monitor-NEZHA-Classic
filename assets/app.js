@@ -101,7 +101,7 @@ function flagFallback(code) {
   function online(server) {
     if (typeof server.is_online === "boolean") return server.is_online;
     const ts = num(server.last_updated);
-    return ts > 0 && Date.now() - ts <= 300000;
+    return ts > 0 && Date.now() - ts <= 60000;
   }
 
   function regionCode(server) {
