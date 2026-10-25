@@ -197,187 +197,132 @@
         };
       }
 
-      function addOutline(
-        fragment,
-        tag,
-        attributes,
-        color,
-        start,
-        duration,
-        elapsed
-      ) {
-        const element = document.createElementNS(NS, tag);
+function addOutline(
+  fragment,
+  tag,
+  attributes,
+  color,
+  start,
+  duration,
+  elapsed
+) {
+  /*
+   * 所有框统一时间轴：
+   * 同时开始，结束前留 100ms 完整展示。
+   *
+   * 忽略调用处原来的分列延迟，
+   * 不必再修改下面的卡片排序代码。
+   */
+  const drawDuration = Math.max(1, CONFIG.duration - 100);
 
-        for (const [name, value] of Object.entries(attributes)) {
-          element.setAttribute(name, value);
-        }
+  function appendPath(d) {
+    const path = document.createElementNS(NS, "path");
 
-        element.setAttribute("class", "intro-outline");
-        element.setAttribute("pathLength", "1");
+    path.setAttribute("d", d);
+    path.setAttribute("class", "intro-outline");
+    path.setAttribute("pathLength", "1");
 
-        element.style.setProperty("--intro-line-color", color);
-        element.style.setProperty("--draw-duration", `${duration}ms`);
+    path.style.setProperty("--intro-line-color", color);
+    path.style.setProperty(
+      "--draw-duration",
+      `${drawDuration}ms`
+    );
 
-        /*
-         * 布局变化后仍沿用同一条时间轴，
-         * 不会每次校正都重新从头画。
-         */
-        element.style.setProperty(
-          "--draw-delay",
-          `${start - elapsed}ms`
-        );
+    /*
+     * 布局重新校正时继承当前进度，
+     * 不重新从头播放。
+     */
+    path.style.setProperty(
+      "--draw-delay",
+      `${-elapsed}ms`
+    );
 
-        fragment.appendChild(element);
-      }
+    fragment.appendChild(path);
+  }
 
-      function update() {
-        if (stopped) return;
+  if (tag === "rect") {
+    const x = Number(attributes.x);
+    const y = Number(attributes.y);
+    const width = Number(attributes.width);
+    const height = Number(attributes.height);
 
-        try {
-          const layout = readLayout();
+    const right = x + width;
+    const bottom = y + height;
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
 
-          // 数据尚未返回时，不画虚假的一行卡片。
-          if (!layout) {
-            if (signature) {
-              svg.replaceChildren();
-              signature = "";
-            }
-            return;
-          }
+    // 保留原卡片和外框的圆角。
+    const radius = Math.max(
+      0,
+      Math.min(
+        Number(attributes.rx) || 0,
+        width / 2,
+        height / 2
+      )
+    );
 
-          /*
-           * 将坐标精度限制到 0.1px，
-           * 避免无意义的小数变化导致重复绘制。
-           */
-          const nextSignature = JSON.stringify(
-            layout,
-            (key, value) => {
-              return typeof value === "number"
-                ? Math.round(value * 10) / 10
-                : value;
-            }
-          );
+    /*
+     * 将边框拆成四条路径。
+     * 左右侧中点同时出发，
+     * 最终在顶部中间、底部中间汇合。
+     */
 
-          if (nextSignature === signature) return;
-          signature = nextSignature;
+    // 左侧中点 → 左上角 → 顶部中间
+    appendPath(`
+      M ${x} ${centerY}
+      L ${x} ${y + radius}
+      Q ${x} ${y} ${x + radius} ${y}
+      L ${centerX} ${y}
+    `);
 
-          const elapsed = performance.now() - startedAt;
-          const drawTime = Math.max(1, CONFIG.duration - 100);
-          const fragment = document.createDocumentFragment();
+    // 右侧中点 → 右上角 → 顶部中间
+    appendPath(`
+      M ${right} ${centerY}
+      L ${right} ${y + radius}
+      Q ${right} ${y} ${right - radius} ${y}
+      L ${centerX} ${y}
+    `);
 
-          svg.setAttribute(
-            "viewBox",
-            `0 0 ${window.innerWidth} ${window.innerHeight}`
-          );
+    // 左侧中点 → 左下角 → 底部中间
+    appendPath(`
+      M ${x} ${centerY}
+      L ${x} ${bottom - radius}
+      Q ${x} ${bottom} ${x + radius} ${bottom}
+      L ${centerX} ${bottom}
+    `);
 
-          // 外框与卡片共同描绘，结束前留 100ms 完整展示。
-          for (const rect of layout.groups) {
-            addOutline(
-              fragment,
-              "rect",
-              {
-                x: rect.x,
-                y: rect.y,
-                width: rect.width,
-                height: rect.height,
-                rx: rect.radius
-              },
-              CONFIG.groupColor,
-              0,
-              drawTime,
-              elapsed
-            );
-          }
+    // 右侧中点 → 右下角 → 底部中间
+    appendPath(`
+      M ${right} ${centerY}
+      L ${right} ${bottom - radius}
+      Q ${right} ${bottom} ${right - radius} ${bottom}
+      L ${centerX} ${bottom}
+    `);
 
-          /*
-           * 按横向位置决定开始时间：
-           * 同一列同时开始，左侧早于右侧。
-           */
-          const minX = Math.min(...layout.cards.map(card => card.x));
-          const maxX = Math.max(...layout.cards.map(card => card.x));
+    return;
+  }
 
-          const centerX = (minX + maxX) / 2;
-          const halfRange = (maxX - minX) / 2;
-          
-          for (const card of layout.cards) {
-            /*
-             * 两侧 progress 为 0，最先开始；
-             * 越靠近中间 progress 越大，稍后开始。
-             * 同一列的上下卡片同步描绘。
-             */
-            const progress = halfRange > 0
-              ? Math.max(
-                  0,
-                  Math.min(
-                    1,
-                    1 - Math.abs(card.x - centerX) / halfRange
-                  )
-                )
-              : 0;
+  if (tag === "line") {
+    const x1 = Number(attributes.x1);
+    const y1 = Number(attributes.y1);
+    const x2 = Number(attributes.x2);
+    const y2 = Number(attributes.y2);
 
-            // 减小开始时间差，让视觉更平缓。
-            const start = progress * drawTime * 0.3;
-            const duration = drawTime - start;
+    const centerX = (x1 + x2) / 2;
+    const centerY = (y1 + y2) / 2;
 
-            addOutline(
-              fragment,
-              "rect",
-              {
-                x: card.x,
-                y: card.y,
-                width: card.width,
-                height: card.height,
-                rx: card.radius
-              },
-              CONFIG.cardColor,
-              start,
-              duration,
-              elapsed
-            );
+    // 分隔线：左右两端同时向中间汇合。
+    appendPath(`
+      M ${x1} ${y1}
+      L ${centerX} ${centerY}
+    `);
 
-            if (card.header) {
-              addOutline(
-                fragment,
-                "line",
-                {
-                  x1: card.header.x1,
-                  y1: card.header.y,
-                  x2: card.header.x2,
-                  y2: card.header.y
-                },
-                CONFIG.headerColor,
-                start + duration * 0.35,
-                duration * 0.65,
-                elapsed
-              );
-            }
-          }
-
-          svg.replaceChildren(fragment);
-        } catch (error) {
-          cleanup();
-          console.warn("[线框开场] 已跳过：", error);
-        }
-      }
-
-      try {
-        root.classList.add("probe-intro-running");
-        startedAt = performance.now();
-
-        update();
-
-        // 只检查页面布局，不访问任何接口。
-        intervalId = setInterval(
-          update,
-          CONFIG.checkInterval
-        );
-
-        // 到时直接显示真实探针，不做粘合或移动效果。
-        endTimer = setTimeout(cleanup, CONFIG.duration);
-      } catch (error) {
-        cleanup();
-      }
-    })();
+    appendPath(`
+      M ${x2} ${y2}
+      L ${centerX} ${centerY}
+    `);
+  }
+}
   </script>
 
   <script src="/assets/app.js"></script>
