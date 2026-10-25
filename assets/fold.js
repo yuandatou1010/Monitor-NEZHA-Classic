@@ -167,7 +167,7 @@
     }
 
     const timestamp = number(record.last_updated);
-    return timestamp > 0 && Date.now() - timestamp <= 300000;
+    return timestamp > 0 && Date.now() - timestamp <= 60000;
   }
 
   function selectRepresentative(keyword, cards) {
