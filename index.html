@@ -10,11 +10,11 @@
 
   <style>
     /*
-     * 保留真实布局，只隐藏内容。
-     * 不使用 display:none，确保能读取卡片尺寸。
+     * 隐藏探针但保留布局，便于读取真实尺寸。
+     * CSS 也设置自动恢复，避免 JS 异常导致一直空白。
      */
-    html.probe-intro-running #app {
-      visibility: hidden;
+    html.probe-intro-active #app {
+      animation: probe-app-reveal 2000ms step-end forwards;
     }
 
     #probe-intro {
@@ -24,6 +24,9 @@
       overflow: hidden;
       background: #fff;
       pointer-events: none;
+
+      /* JS 之外的第二层保护 */
+      animation: probe-overlay-hide 2000ms step-end forwards;
     }
 
     #probe-intro svg {
@@ -32,33 +35,39 @@
       height: 100%;
     }
 
-    #probe-intro .intro-outline {
+    #probe-intro .probe-intro-line {
       fill: none;
-      stroke: var(--intro-line-color, #bac8d0);
       stroke-width: 1;
-      vector-effect: non-scaling-stroke;
       stroke-linecap: round;
       stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
 
       stroke-dasharray: 1;
       stroke-dashoffset: 1;
 
-      animation:
-        probe-draw
-        var(--draw-duration)
-        linear
-        var(--draw-delay)
-        both;
+      animation-name: probe-line-draw;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
     }
 
-    @keyframes probe-draw {
+    @keyframes probe-line-draw {
       from { stroke-dashoffset: 1; }
       to   { stroke-dashoffset: 0; }
     }
 
+    @keyframes probe-app-reveal {
+      from { visibility: hidden; }
+      to   { visibility: visible; }
+    }
+
+    @keyframes probe-overlay-hide {
+      from { visibility: visible; }
+      to   { visibility: hidden; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      #probe-intro .intro-outline {
-        animation: none;
+      #probe-intro .probe-intro-line {
+        animation: none !important;
         stroke-dashoffset: 0;
       }
     }
@@ -76,253 +85,331 @@
     (() => {
       "use strict";
 
-      /* ================= 动画配置区 ================= */
+      /* ================= 配置区 ================= */
 
       const CONFIG = {
-        // 整体展示时间：3000 = 3 秒。
-        duration: 2500,
+        // 总时长。若修改，也请同步修改 CSS 中的两个 2000ms。
+        duration: 2000,
 
-        // 布局检查间隔，不产生网络请求。
+        // 提前画完，稍微展示一下完整线框。
+        finishBefore: 100,
+
+        // 检查实际布局的间隔，不产生网络请求。
         checkInterval: 100,
 
-        // 是否绘制卡片名称下方的分隔线。
+        // 是否绘制卡片标题下方的分隔线。
         drawHeaderLine: true,
 
-        // 描线颜色。
+        // 线条颜色。
         groupColor: "#c5cdd2",
         cardColor: "#b6c6d0",
         headerColor: "#dce3e7"
       };
-
-      /*
-       * 外框尺寸、卡片宽高、列数、间距、卡片数量：
-       * 全部读取页面实际布局，不需要在这里重复配置。
-       */
 
       /* =============== 配置区结束 =============== */
 
       const root = document.documentElement;
       const app = document.getElementById("app");
       const overlay = document.getElementById("probe-intro");
-      const svg = overlay.querySelector("svg");
+      const svg = overlay && overlay.querySelector("svg");
+
       const NS = "http://www.w3.org/2000/svg";
 
-      let startedAt = 0;
-      let signature = "";
-      let intervalId;
-      let endTimer;
       let stopped = false;
+      let intervalId = null;
+      let endTimer = null;
+      let lastSignature = "";
+
+      const startedAt = performance.now();
 
       function cleanup() {
-        if (stopped) return;
         stopped = true;
 
         clearInterval(intervalId);
         clearTimeout(endTimer);
 
-        root.classList.remove("probe-intro-running");
-        overlay.remove();
+        root.classList.remove("probe-intro-active");
+
+        if (overlay) {
+          overlay.remove();
+        }
       }
 
-      function isVisible(rect) {
-        return (
-          rect.width > 0 &&
-          rect.height > 0 &&
-          rect.right > 0 &&
-          rect.bottom > 0 &&
-          rect.left < window.innerWidth &&
-          rect.top < window.innerHeight
-        );
-      }
+      /*
+       * 先设置结束保护，再执行任何绘图。
+       * 绘图异常时也不会永久挡住页面。
+       */
+      endTimer = setTimeout(cleanup, CONFIG.duration);
 
-      function readBox(element) {
-        const rect = element.getBoundingClientRect();
-        const style = getComputedStyle(element);
+      try {
+        if (!app || !overlay || !svg) {
+          cleanup();
+          return;
+        }
 
-        return {
-          x: rect.left,
-          y: rect.top,
-          width: rect.width,
-          height: rect.height,
-          radius: parseFloat(style.borderTopLeftRadius) || 0
-        };
-      }
+        root.classList.add("probe-intro-active");
 
-      function readLayout() {
-        /*
-         * 排除被 fold.js 隐藏的机器。
-         * visibility:hidden 是我们设置的，不影响尺寸读取。
-         */
-        const cards = Array.from(
-          app.querySelectorAll(".card[data-id]")
-        ).filter(card => {
+        function inViewport(rect) {
           return (
-            getComputedStyle(card).display !== "none" &&
-            isVisible(card.getBoundingClientRect())
+            rect.width > 0 &&
+            rect.height > 0 &&
+            rect.right > 0 &&
+            rect.bottom > 0 &&
+            rect.left < window.innerWidth &&
+            rect.top < window.innerHeight
           );
-        });
+        }
 
-        if (!cards.length) return null;
+        function readBox(element) {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
 
-        const groups = Array.from(
-          app.querySelectorAll(".group")
-        ).filter(group => {
-          return (
-            getComputedStyle(group).display !== "none" &&
-            isVisible(group.getBoundingClientRect())
+          return {
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height,
+            radius: parseFloat(style.borderTopLeftRadius) || 0
+          };
+        }
+
+        function readLayout() {
+          const cards = Array.from(
+            app.querySelectorAll(".card[data-id]")
+          ).filter(card => {
+            return (
+              getComputedStyle(card).display !== "none" &&
+              inViewport(card.getBoundingClientRect())
+            );
+          });
+
+          if (!cards.length) return null;
+
+          const groups = Array.from(
+            app.querySelectorAll(".group")
+          ).filter(group => {
+            return (
+              getComputedStyle(group).display !== "none" &&
+              inViewport(group.getBoundingClientRect())
+            );
+          });
+
+          return {
+            width: window.innerWidth,
+            height: window.innerHeight,
+
+            groups: groups.map(readBox),
+
+            cards: cards.map(card => {
+              const result = readBox(card);
+              const header = card.querySelector(".card-head");
+
+              if (header && CONFIG.drawHeaderLine) {
+                const rect = header.getBoundingClientRect();
+
+                result.header = {
+                  left: rect.left,
+                  right: rect.right,
+                  y: rect.bottom
+                };
+              }
+
+              return result;
+            })
+          };
+        }
+
+        function appendPath(fragment, d, color, elapsed) {
+          const path = document.createElementNS(NS, "path");
+
+          path.setAttribute("d", d);
+          path.setAttribute("class", "probe-intro-line");
+          path.setAttribute("pathLength", "1");
+          path.setAttribute("stroke", color);
+
+          const drawDuration = Math.max(
+            1,
+            CONFIG.duration - CONFIG.finishBefore
           );
-        });
 
-        return {
-          viewport: [window.innerWidth, window.innerHeight],
+          path.style.animationDuration = `${drawDuration}ms`;
 
-          groups: groups.map(readBox),
+          /*
+           * 负延迟：重新读取布局时沿用当前动画进度，
+           * 不从头再画一次。
+           */
+          path.style.animationDelay = `${-elapsed}ms`;
 
-          cards: cards.map(card => {
-            const result = readBox(card);
-            const header = card.querySelector(".card-head");
+          fragment.appendChild(path);
+        }
 
-            if (header && CONFIG.drawHeaderLine) {
-              const rect = header.getBoundingClientRect();
+        function drawBox(fragment, box, color, elapsed) {
+          const x = box.x;
+          const y = box.y;
+          const right = x + box.width;
+          const bottom = y + box.height;
 
-              result.header = {
-                x1: rect.left,
-                x2: rect.right,
-                y: rect.bottom
-              };
+          const middleX = x + box.width / 2;
+          const middleY = y + box.height / 2;
+
+          const radius = Math.max(
+            0,
+            Math.min(
+              box.radius,
+              box.width / 2,
+              box.height / 2
+            )
+          );
+
+          // 左侧中点 → 左上角 → 顶部中间
+          appendPath(
+            fragment,
+            `
+              M ${x} ${middleY}
+              L ${x} ${y + radius}
+              Q ${x} ${y} ${x + radius} ${y}
+              L ${middleX} ${y}
+            `,
+            color,
+            elapsed
+          );
+
+          // 右侧中点 → 右上角 → 顶部中间
+          appendPath(
+            fragment,
+            `
+              M ${right} ${middleY}
+              L ${right} ${y + radius}
+              Q ${right} ${y} ${right - radius} ${y}
+              L ${middleX} ${y}
+            `,
+            color,
+            elapsed
+          );
+
+          // 左侧中点 → 左下角 → 底部中间
+          appendPath(
+            fragment,
+            `
+              M ${x} ${middleY}
+              L ${x} ${bottom - radius}
+              Q ${x} ${bottom} ${x + radius} ${bottom}
+              L ${middleX} ${bottom}
+            `,
+            color,
+            elapsed
+          );
+
+          // 右侧中点 → 右下角 → 底部中间
+          appendPath(
+            fragment,
+            `
+              M ${right} ${middleY}
+              L ${right} ${bottom - radius}
+              Q ${right} ${bottom} ${right - radius} ${bottom}
+              L ${middleX} ${bottom}
+            `,
+            color,
+            elapsed
+          );
+        }
+
+        function update() {
+          if (stopped) return;
+
+          try {
+            const layout = readLayout();
+
+            if (!layout) {
+              if (lastSignature) {
+                svg.replaceChildren();
+                lastSignature = "";
+              }
+              return;
             }
 
-            return result;
-          })
-        };
+            const signature = JSON.stringify(
+              layout,
+              (key, value) => {
+                return typeof value === "number"
+                  ? Math.round(value * 10) / 10
+                  : value;
+              }
+            );
+
+            if (signature === lastSignature) return;
+            lastSignature = signature;
+
+            const elapsed = performance.now() - startedAt;
+            const fragment = document.createDocumentFragment();
+
+            svg.setAttribute(
+              "viewBox",
+              `0 0 ${layout.width} ${layout.height}`
+            );
+
+            // 所有大框同时绘制。
+            for (const group of layout.groups) {
+              drawBox(
+                fragment,
+                group,
+                CONFIG.groupColor,
+                elapsed
+              );
+            }
+
+            // 所有小卡片同时绘制，不排序、不设置分列延迟。
+            for (const card of layout.cards) {
+              drawBox(
+                fragment,
+                card,
+                CONFIG.cardColor,
+                elapsed
+              );
+
+              if (card.header) {
+                const header = card.header;
+                const middle = (header.left + header.right) / 2;
+
+                // 分隔线左端 → 中间
+                appendPath(
+                  fragment,
+                  `M ${header.left} ${header.y}
+                   L ${middle} ${header.y}`,
+                  CONFIG.headerColor,
+                  elapsed
+                );
+
+                // 分隔线右端 → 中间
+                appendPath(
+                  fragment,
+                  `M ${header.right} ${header.y}
+                   L ${middle} ${header.y}`,
+                  CONFIG.headerColor,
+                  elapsed
+                );
+              }
+            }
+
+            svg.replaceChildren(fragment);
+          } catch (error) {
+            cleanup();
+            console.warn("[线框开场] 绘制失败，已显示探针：", error);
+          }
+        }
+
+        intervalId = setInterval(
+          update,
+          CONFIG.checkInterval
+        );
+
+        update();
+
+      } catch (error) {
+        cleanup();
+        console.warn("[线框开场] 初始化失败，已显示探针：", error);
       }
-
-function addOutline(
-  fragment,
-  tag,
-  attributes,
-  color,
-  start,
-  duration,
-  elapsed
-) {
-  /*
-   * 所有框统一时间轴：
-   * 同时开始，结束前留 100ms 完整展示。
-   *
-   * 忽略调用处原来的分列延迟，
-   * 不必再修改下面的卡片排序代码。
-   */
-  const drawDuration = Math.max(1, CONFIG.duration - 100);
-
-  function appendPath(d) {
-    const path = document.createElementNS(NS, "path");
-
-    path.setAttribute("d", d);
-    path.setAttribute("class", "intro-outline");
-    path.setAttribute("pathLength", "1");
-
-    path.style.setProperty("--intro-line-color", color);
-    path.style.setProperty(
-      "--draw-duration",
-      `${drawDuration}ms`
-    );
-
-    /*
-     * 布局重新校正时继承当前进度，
-     * 不重新从头播放。
-     */
-    path.style.setProperty(
-      "--draw-delay",
-      `${-elapsed}ms`
-    );
-
-    fragment.appendChild(path);
-  }
-
-  if (tag === "rect") {
-    const x = Number(attributes.x);
-    const y = Number(attributes.y);
-    const width = Number(attributes.width);
-    const height = Number(attributes.height);
-
-    const right = x + width;
-    const bottom = y + height;
-    const centerX = x + width / 2;
-    const centerY = y + height / 2;
-
-    // 保留原卡片和外框的圆角。
-    const radius = Math.max(
-      0,
-      Math.min(
-        Number(attributes.rx) || 0,
-        width / 2,
-        height / 2
-      )
-    );
-
-    /*
-     * 将边框拆成四条路径。
-     * 左右侧中点同时出发，
-     * 最终在顶部中间、底部中间汇合。
-     */
-
-    // 左侧中点 → 左上角 → 顶部中间
-    appendPath(`
-      M ${x} ${centerY}
-      L ${x} ${y + radius}
-      Q ${x} ${y} ${x + radius} ${y}
-      L ${centerX} ${y}
-    `);
-
-    // 右侧中点 → 右上角 → 顶部中间
-    appendPath(`
-      M ${right} ${centerY}
-      L ${right} ${y + radius}
-      Q ${right} ${y} ${right - radius} ${y}
-      L ${centerX} ${y}
-    `);
-
-    // 左侧中点 → 左下角 → 底部中间
-    appendPath(`
-      M ${x} ${centerY}
-      L ${x} ${bottom - radius}
-      Q ${x} ${bottom} ${x + radius} ${bottom}
-      L ${centerX} ${bottom}
-    `);
-
-    // 右侧中点 → 右下角 → 底部中间
-    appendPath(`
-      M ${right} ${centerY}
-      L ${right} ${bottom - radius}
-      Q ${right} ${bottom} ${right - radius} ${bottom}
-      L ${centerX} ${bottom}
-    `);
-
-    return;
-  }
-
-  if (tag === "line") {
-    const x1 = Number(attributes.x1);
-    const y1 = Number(attributes.y1);
-    const x2 = Number(attributes.x2);
-    const y2 = Number(attributes.y2);
-
-    const centerX = (x1 + x2) / 2;
-    const centerY = (y1 + y2) / 2;
-
-    // 分隔线：左右两端同时向中间汇合。
-    appendPath(`
-      M ${x1} ${y1}
-      L ${centerX} ${centerY}
-    `);
-
-    appendPath(`
-      M ${x2} ${y2}
-      L ${centerX} ${centerY}
-    `);
-  }
-}
+    })();
   </script>
 
   <script src="/assets/app.js"></script>
