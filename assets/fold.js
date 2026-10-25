@@ -89,15 +89,15 @@
 
   const CONFIG = {
     keywords: [
-      "香港-阿里",
+      "阿里",
       // "日本-甲骨文",
     ],
 
     // 弹层最多多少列，同时不会超过原页面网格列数。
-    popupMaxColumns: 6,
+    popupMaxColumns: 5,
 
     // 折叠入口距离卡片右边约多少 px。
-    triggerRightPx: 25,
+    triggerRightPx: 20,
   };
 
   /*
