@@ -636,3 +636,112 @@ body {
 .ws-status.disconnected span {
   background: #E68E8E;
 }
+
+/* ================= 卡片折叠功能 ================= */
+
+/* 被折叠的卡片 */
+.card.cf-fold-hidden {
+  display: none !important;
+}
+
+/*
+ * 时间行：标签 | 在线时间 | 折叠入口
+ * 入口独立于 .text-value，避免实时更新时闪烁。
+ */
+.card .text-row.cf-fold-time-row {
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  padding-right: var(--cf-fold-extra-right, 7px);
+}
+
+.cf-fold-trigger {
+  display: inline-block;
+  margin: 0;
+  padding: 0 0 0 5px;
+  border: 0;
+  background: transparent;
+  color: #168fe0;
+  font: inherit;
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cf-fold-trigger:hover {
+  color: #0875bd;
+  text-decoration: underline;
+}
+
+.cf-fold-trigger:focus-visible {
+  outline: 2px solid #168fe0;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* 全屏遮罩：50% 黑色背景 + 模糊 */
+#cf-fold-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: block;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+#cf-fold-overlay[hidden] {
+  display: none !important;
+}
+
+/* 内容少时居中，内容过多时允许滚动 */
+#cf-fold-overlay .cf-fold-stage {
+  display: flex;
+  min-height: 100%;
+  padding: 28px 20px;
+}
+
+/* 弹出卡片组的白色细边框容器 */
+#cf-fold-overlay .cf-fold-panel {
+  flex: 0 0 auto;
+  margin: auto;
+  padding: 22px;
+  border: 1px solid #dcdcdc;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.16);
+  outline: none;
+}
+
+/* 多列布局：列数由 fold.js 根据屏幕宽度计算 */
+#cf-fold-overlay .cf-fold-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    var(--cf-fold-columns, 1),
+    var(--cf-fold-card-width, 278px)
+  );
+  column-gap: var(--cf-fold-column-gap, 27px);
+  row-gap: var(--cf-fold-row-gap, 23px);
+  justify-content: center;
+}
+
+/* 沿用原卡片尺寸 */
+#cf-fold-overlay .cf-fold-grid > .card {
+  width: var(--cf-fold-card-width, 278px);
+  min-width: var(--cf-fold-card-width, 278px);
+  max-width: var(--cf-fold-card-width, 278px);
+  height: var(--cf-fold-card-height, 333px);
+  background: #fff;
+}
+
+/* 手机端缩小外框留白 */
+@media (max-width: 620px) {
+  #cf-fold-overlay .cf-fold-stage {
+    padding: 20px 12px;
+  }
+
+  #cf-fold-overlay .cf-fold-panel {
+    padding: 14px;
+  }
+}
