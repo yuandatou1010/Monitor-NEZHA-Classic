@@ -9,85 +9,133 @@
   <link rel="stylesheet" href="/assets/app.css">
 
   <style>
-    /* 独立开场层，不影响原探针布局 */
-    #world-intro {
+    /*
+     * 使用 visibility，不使用 display:none，
+     * 保留探针真实布局，方便读取卡片位置。
+     */
+    html.probe-intro-running #app {
+      visibility: hidden;
+    }
+
+    html.probe-intro-joining #app {
+      visibility: visible;
+      animation: probe-content-join 300ms ease both;
+    }
+
+    #probe-intro {
       position: fixed;
       inset: 0;
       z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       overflow: hidden;
-      background: #fff;
-      opacity: 1;
-      transition: opacity 650ms ease;
-    }
-
-    #world-intro.is-leaving {
-      opacity: 0;
       pointer-events: none;
+      background: #fff;
     }
 
-    .world-intro-content {
-      width: min(1120px, 96vw);
-      padding: 20px 0;
-    }
-
-    #world-map {
+    #probe-intro svg {
       display: block;
       width: 100%;
-      aspect-ratio: 2 / 1;
+      height: 100%;
+      overflow: visible;
     }
 
-    .world-intro-caption {
-      margin-top: 12px;
-      text-align: center;
-      color: #8b9daa;
-      font-family: Arial, "Microsoft YaHei", sans-serif;
-      font-size: 12px;
-      letter-spacing: 2px;
+    /* 正在描绘的边框 */
+    #probe-intro .intro-outline {
+      fill: none;
+      stroke: #b9c9d3;
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+
+      animation:
+        probe-outline-draw
+        var(--draw-duration)
+        cubic-bezier(.35, 0, .2, 1)
+        var(--draw-delay)
+        both;
     }
 
-    .world-intro-caption::before {
-      content: "";
-      display: inline-block;
-      width: 7px;
-      height: 7px;
-      margin-right: 9px;
-      border-radius: 2px;
-      background: #38c789;
-      box-shadow: 0 0 8px rgba(56, 199, 137, .25);
+    #probe-intro .intro-group-outline {
+      stroke: #c8d0d5;
     }
 
-    @media (max-width: 620px) {
-      .world-intro-content {
-        width: 98vw;
+    /* 卡片顶部分隔线，稍微增加原模板的辨识度 */
+    #probe-intro .intro-header-line {
+      stroke: #dbe2e6;
+    }
+
+    /* 最后 0.3 秒：错开的线条归位 */
+    #probe-intro .intro-piece {
+      transform: translate(
+        var(--piece-x, 0px),
+        var(--piece-y, 0px)
+      );
+
+      transition: transform 300ms cubic-bezier(.2, .8, .2, 1);
+    }
+
+    #probe-intro.is-joining {
+      background: transparent;
+      opacity: 0;
+      transition: opacity 300ms ease;
+    }
+
+    #probe-intro.is-joining .intro-piece {
+      transform: translate(0, 0);
+    }
+
+    @keyframes probe-outline-draw {
+      from {
+        stroke-dashoffset: 1;
+        opacity: .45;
       }
 
-      .world-intro-caption {
-        margin-top: 20px;
-        font-size: 11px;
-        letter-spacing: 1px;
+      to {
+        stroke-dashoffset: 0;
+        opacity: 1;
+      }
+    }
+
+    @keyframes probe-content-join {
+      from {
+        opacity: 0;
+        filter: blur(1.5px);
+      }
+
+      to {
+        opacity: 1;
+        filter: blur(0);
       }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      #world-intro {
+      #probe-intro .intro-outline {
+        animation: none;
+        stroke-dashoffset: 0;
+      }
+
+      #probe-intro .intro-piece {
+        transform: none;
         transition: none;
+      }
+
+      html.probe-intro-joining #app {
+        animation: none;
       }
     }
   </style>
+
+  <script>
+    document.documentElement.classList.add("probe-intro-running");
+  </script>
 </head>
 
 <body>
-  <!-- 开场地图：与 #app 分开，避免模板渲染时被覆盖 -->
-  <div id="world-intro" aria-hidden="true">
-    <div class="world-intro-content">
-      <canvas id="world-map"></canvas>
-      <div class="world-intro-caption">
-        全球节点 · 静态效果预览
-      </div>
-    </div>
+  <div id="probe-intro" aria-hidden="true">
+    <svg xmlns="http://www.w3.org/2000/svg"></svg>
   </div>
 
   <main id="app"></main>
@@ -99,423 +147,378 @@
       /* ================= 配置区 ================= */
 
       const CONFIG = {
-        // 开场停留多久，单位毫秒。
-        // 改成 0 可以一直展示地图，方便调试。
-        duration: 5000,
+        // 整体约 3 秒，最后 0.3 秒用于归位融合。
+        totalDuration: 3000,
+        joinDuration: 300,
 
-        // 地图每个小方块的间隔，越小越精细。
-        dotStep: 7,
+        /*
+         * 最多等待真实卡片布局多久。
+         * 超时后按原 CSS 变量画示意布局，不请求接口。
+         */
+        layoutWait: 350,
 
-        // 方块之间保留的空隙。
-        dotGap: 2,
-
-        // 地图基础颜色。
-        landColor: "#c3e2f2",
-
-        // 固定点亮的位置，不调用数据接口。
-        locations: [
-          {
-            name: "香港",
-            lon: 114.17,
-            lat: 22.32,
-            labelX: -45,
-            labelY: 24,
-            phase: 0
-          },
-          {
-            name: "台湾",
-            lon: 121.0,
-            lat: 23.7,
-            labelX: 38,
-            labelY: 17,
-            phase: 1.2
-          },
-          {
-            name: "日本",
-            lon: 138.0,
-            lat: 37.0,
-            labelX: 28,
-            labelY: -18,
-            phase: 2.3
-          },
-          {
-            name: "新加坡",
-            lon: 103.82,
-            lat: 1.35,
-            labelX: 35,
-            labelY: 30,
-            phase: 3.4
-          },
-          {
-            name: "美国",
-            lon: -99.0,
-            lat: 38.0,
-            labelX: 0,
-            labelY: -29,
-            phase: 4.5
-          }
-        ]
+        // 线条绘制前的小幅错位，最后归位产生“粘合”感。
+        pieceOffset: 5
       };
 
       /* =============== 配置区结束 =============== */
 
-      const overlay = document.getElementById("world-intro");
-      const canvas = document.getElementById("world-map");
-      const ctx = canvas.getContext("2d");
+      const root = document.documentElement;
+      const app = document.getElementById("app");
+      const overlay = document.getElementById("probe-intro");
+      const svg = overlay.querySelector("svg");
 
-      if (!ctx) {
-        overlay.remove();
-        return;
-      }
+      const NS = "http://www.w3.org/2000/svg";
+      const startedAt = performance.now();
+
+      let built = false;
+      let observer;
+      let layoutTimer;
+      let joinTimer;
+      let endTimer;
+      let frame;
 
       const reducedMotion = window.matchMedia(
         "(prefers-reduced-motion: reduce)"
       ).matches;
 
-      /*
-       * 简化大陆轮廓，经度、纬度坐标。
-       * 仅用于开场视觉效果，不用于精确地理展示。
-       */
-      const landPolygons = [
-        // 北美洲
-        [
-          [-168,72],[-148,72],[-135,68],[-125,72],
-          [-110,73],[-95,75],[-78,70],[-61,58],
-          [-66,49],[-81,25],[-87,21],[-97,16],
-          [-105,23],[-112,30],[-120,36],[-126,49],
-          [-138,58],[-151,60],[-163,64]
-        ],
-
-        // 中美洲
-        [
-          [-98,22],[-87,22],[-86,16],[-79,9],
-          [-76,8],[-82,8],[-90,15]
-        ],
-
-        // 格陵兰
-        [
-          [-55,60],[-43,60],[-25,72],[-28,82],
-          [-48,84],[-63,77],[-60,68]
-        ],
-
-        // 南美洲
-        [
-          [-81,12],[-70,11],[-60,7],[-50,2],
-          [-35,-6],[-40,-22],[-49,-30],[-56,-40],
-          [-66,-55],[-73,-49],[-73,-32],[-79,-10]
-        ],
-
-        // 欧洲与亚洲
-        [
-          [-10,36],[-10,44],[-2,49],[-5,58],
-          [8,58],[12,70],[28,71],[34,61],
-          [48,68],[70,73],[100,76],[130,72],
-          [153,65],[177,64],[170,55],[155,50],
-          [143,45],[137,35],[126,39],[122,31],
-          [121,23],[109,18],[108,10],[103,1],
-          [98,8],[96,20],[88,22],[80,8],
-          [74,15],[66,25],[56,25],[49,14],
-          [43,13],[35,30],[29,36],[23,39],
-          [16,38],[10,44],[2,42]
-        ],
-
-        // 非洲
-        [
-          [-17,35],[-5,36],[10,37],[25,32],
-          [34,30],[43,12],[51,11],[43,-3],
-          [39,-16],[31,-29],[20,-35],[12,-24],
-          [8,-5],[-3,5],[-15,10],[-17,22]
-        ],
-
-        // 阿拉伯半岛
-        [
-          [35,30],[48,30],[57,22],
-          [50,15],[43,13],[38,21]
-        ],
-
-        // 英国、爱尔兰
-        [
-          [-10,50],[-3,50],[0,58],
-          [-5,59],[-8,55]
-        ],
-
-        // 冰岛
-        [
-          [-24,63],[-13,63],[-14,67],[-23,67]
-        ],
-
-        // 日本
-        [
-          [130,31],[134,33],[138,36],
-          [141,41],[145,44],[143,45],
-          [139,40],[135,35],[131,34]
-        ],
-
-        // 台湾
-        [
-          [120,22],[122,24],[122,26],[120,25]
-        ],
-
-        // 菲律宾
-        [
-          [120,19],[123,18],[126,8],
-          [123,6],[120,12]
-        ],
-
-        // 苏门答腊
-        [
-          [95,5],[100,1],[106,-6],
-          [103,-7],[98,-2]
-        ],
-
-        // 爪哇
-        [
-          [105,-6],[115,-7],[114,-9],[106,-8]
-        ],
-
-        // 婆罗洲
-        [
-          [109,7],[118,6],[119,-2],
-          [114,-4],[109,0]
-        ],
-
-        // 新几内亚
-        [
-          [131,-2],[141,-3],[151,-7],
-          [148,-10],[136,-7]
-        ],
-
-        // 澳大利亚
-        [
-          [113,-22],[122,-15],[130,-12],
-          [137,-13],[142,-10],[146,-20],
-          [153,-27],[149,-38],[138,-36],
-          [130,-32],[116,-35]
-        ],
-
-        // 新西兰
-        [
-          [172,-34],[178,-38],[173,-42],
-          [168,-47],[166,-45],[171,-40]
-        ],
-
-        // 马达加斯加
-        [
-          [48,-13],[51,-17],[47,-26],[44,-24]
-        ]
-      ];
-
-      // 固定逻辑尺寸，实际显示自适应屏幕。
-      const WIDTH = 1000;
-      const HEIGHT = 500;
-
-      let pixels = [];
-      let frameId = 0;
-      let stopped = false;
-      let leaveTimer = 0;
-      let removeTimer = 0;
-
-      function project(lon, lat) {
-        return {
-          x: 30 + (lon + 180) / 360 * 940,
-          y: 35 + (85 - lat) / 145 * 410
-        };
-      }
-
-      function pointInPolygon(x, y, polygon) {
-        let inside = false;
-
-        for (
-          let i = 0, j = polygon.length - 1;
-          i < polygon.length;
-          j = i++
-        ) {
-          const a = polygon[i];
-          const b = polygon[j];
-
-          const crosses =
-            (a.y > y) !== (b.y > y) &&
-            x < (b.x - a.x) * (y - a.y) /
-              (b.y - a.y) + a.x;
-
-          if (crosses) inside = !inside;
-        }
-
-        return inside;
-      }
-
-      const projectedLand = landPolygons.map(polygon => {
-        return polygon.map(([lon, lat]) => project(lon, lat));
-      });
-
-      const locations = CONFIG.locations.map(location => ({
-        ...location,
-        ...project(location.lon, location.lat)
-      }));
-
-      function preparePixels() {
-        pixels = [];
-
-        const step = CONFIG.dotStep;
-
-        for (let y = 25; y < HEIGHT - 35; y += step) {
-          for (let x = 20; x < WIDTH - 20; x += step) {
-            const onLand = projectedLand.some(polygon => {
-              return pointInPolygon(x, y, polygon);
-            });
-
-            if (onLand) pixels.push({ x, y });
-          }
-        }
-      }
-
-      function resize() {
-        const rect = canvas.getBoundingClientRect();
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-
-        canvas.width = Math.max(1, Math.round(rect.width * dpr));
-        canvas.height = Math.max(1, Math.round(rect.height * dpr));
-
-        ctx.setTransform(
-          canvas.width / WIDTH,
-          0,
-          0,
-          canvas.height / HEIGHT,
-          0,
-          0
-        );
-      }
-
-      function drawLocation(location, time) {
-        const pulse = reducedMotion
-          ? 0.5
-          : (Math.sin(time * 0.0028 + location.phase) + 1) / 2;
-
-        const step = CONFIG.dotStep;
-        const size = step - CONFIG.dotGap;
-
-        // 轻微缩放起伏，不让标记实际乱跑。
-        const scale = 0.94 + pulse * 0.12;
-
-        ctx.save();
-        ctx.translate(location.x, location.y);
-        ctx.scale(scale, scale);
-
-        /*
-         * 中心实心绿，外圈渐变浅绿。
-         * 独立绘制，确保香港、新加坡等小地区也能看见。
-         */
-        for (let row = -2; row <= 2; row++) {
-          for (let col = -2; col <= 2; col++) {
-            const distance = Math.hypot(col, row);
-
-            if (distance > 2.25) continue;
-
-            const strength = Math.max(0, 1 - distance / 2.7);
-            const alpha = Math.min(
-              1,
-              strength * (0.55 + pulse * 0.35)
-            );
-
-            ctx.fillStyle = `rgba(35, 193, 126, ${alpha})`;
-
-            ctx.fillRect(
-              col * step - size / 2,
-              row * step - size / 2,
-              size,
-              size
-            );
-          }
-        }
-
-        ctx.fillStyle = "#16b978";
-        ctx.shadowColor = "rgba(35, 193, 126, .45)";
-        ctx.shadowBlur = 5 + pulse * 7;
-
-        ctx.fillRect(-size / 2, -size / 2, size, size);
-        ctx.restore();
-
-        // 地区名称和细引导线。
-        const labelX = location.x + location.labelX;
-        const labelY = location.y + location.labelY;
-
-        ctx.beginPath();
-        ctx.moveTo(location.x, location.y);
-        ctx.lineTo(labelX, labelY);
-        ctx.strokeStyle = "rgba(48, 160, 119, .38)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        ctx.font = '13px Arial, "Microsoft YaHei", sans-serif';
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-
-        // 白色描边，防止文字与地图重叠时看不清。
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = "rgba(255,255,255,.95)";
-        ctx.strokeText(location.name, labelX, labelY);
-
-        ctx.fillStyle = "#29866a";
-        ctx.fillText(location.name, labelX, labelY);
-      }
-
-      function draw(time) {
-        if (stopped) return;
-
-        ctx.clearRect(0, 0, WIDTH, HEIGHT);
-        ctx.fillStyle = CONFIG.landColor;
-
-        const size = CONFIG.dotStep - CONFIG.dotGap;
-
-        for (const pixel of pixels) {
-          ctx.fillRect(
-            pixel.x - size / 2,
-            pixel.y - size / 2,
-            size,
-            size
-          );
-        }
-
-        for (const location of locations) {
-          drawLocation(location, time);
-        }
-
-        if (!reducedMotion) {
-          frameId = requestAnimationFrame(draw);
-        }
-      }
-
       function cleanup() {
-        stopped = true;
-        cancelAnimationFrame(frameId);
-        clearTimeout(leaveTimer);
-        clearTimeout(removeTimer);
-        window.removeEventListener("resize", handleResize);
+        observer?.disconnect();
+        clearTimeout(layoutTimer);
+        clearTimeout(joinTimer);
+        clearTimeout(endTimer);
+        cancelAnimationFrame(frame);
+
+        root.classList.remove(
+          "probe-intro-running",
+          "probe-intro-joining"
+        );
+
         overlay.remove();
       }
 
-      function handleResize() {
-        resize();
+      function cssNumber(style, name, fallback) {
+        const value = parseFloat(style.getPropertyValue(name));
+        return Number.isFinite(value) ? value : fallback;
+      }
 
-        if (reducedMotion) draw(0);
+      function box(rect) {
+        return {
+          x: rect.left,
+          y: rect.top,
+          width: rect.width,
+          height: rect.height
+        };
+      }
+
+      function visible(rect) {
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          rect.right > 0 &&
+          rect.bottom > 0 &&
+          rect.left < window.innerWidth &&
+          rect.top < window.innerHeight
+        );
+      }
+
+      /*
+       * 读取实际布局。
+       * visibility:hidden 不影响 getBoundingClientRect()。
+       */
+      function readActualLayout() {
+        const cards = Array.from(
+          app.querySelectorAll(".card[data-id]")
+        ).filter(card => {
+          return (
+            getComputedStyle(card).display !== "none" &&
+            visible(card.getBoundingClientRect())
+          );
+        });
+
+        if (!cards.length) return null;
+
+        const groups = Array.from(
+          app.querySelectorAll(".group")
+        ).filter(group => visible(group.getBoundingClientRect()));
+
+        return {
+          groups: groups.map(group => box(
+            group.getBoundingClientRect()
+          )),
+
+          cards: cards.map(card => {
+            const rect = card.getBoundingClientRect();
+            const header = card.querySelector(".card-head");
+
+            return {
+              ...box(rect),
+              headerY: header
+                ? header.getBoundingClientRect().bottom - rect.top
+                : 45,
+              padding: parseFloat(
+                getComputedStyle(card).paddingLeft
+              ) || 17
+            };
+          })
+        };
+      }
+
+      /*
+       * 接口较慢时，按原 CSS 的尺寸与间距绘制一行示意框。
+       * 此处仅做视觉展示，不代表真实服务器数量。
+       */
+      function fallbackLayout() {
+        const style = getComputedStyle(root);
+        const bodyStyle = getComputedStyle(document.body);
+
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        const cardWidth = cssNumber(style, "--card-width", 278);
+        const cardHeight = cssNumber(style, "--card-height", 333);
+        const gap = cssNumber(style, "--card-column-gap", 27);
+        const paddingX = cssNumber(style, "--group-padding-x", 28);
+        const paddingY = cssNumber(style, "--group-padding-y", 28);
+
+        const bodyLeft = parseFloat(bodyStyle.paddingLeft) || 0;
+        const bodyRight = parseFloat(bodyStyle.paddingRight) || 0;
+
+        const maxWidth = cssNumber(
+          style,
+          "--outer-max-width",
+          1988
+        );
+
+        const groupWidth = Math.max(
+          1,
+          Math.min(width - bodyLeft - bodyRight, maxWidth)
+        );
+
+        const desiredColumns = Math.max(
+          1,
+          Math.floor(cssNumber(style, "--cards-per-row", 6))
+        );
+
+        const available = Math.max(1, groupWidth - paddingX * 2);
+
+        const columns = Math.max(1, Math.min(
+          desiredColumns,
+          Math.floor((available + gap) / (cardWidth + gap))
+        ));
+
+        const gridWidth =
+          columns * cardWidth + (columns - 1) * gap;
+
+        const groupHeight = cardHeight + paddingY * 2;
+
+        const offset = cssNumber(style, "--layout-y-offset", -5);
+
+        const groupX = (width - groupWidth) / 2;
+        const groupY = Math.max(
+          10,
+          (height - groupHeight) / 2 - 14 + offset
+        );
+
+        const startX = groupX + (groupWidth - gridWidth) / 2;
+        const startY = groupY + paddingY;
+
+        return {
+          groups: [{
+            x: groupX,
+            y: groupY,
+            width: groupWidth,
+            height: groupHeight
+          }],
+
+          cards: Array.from({ length: columns }, (_, index) => ({
+            x: startX + index * (cardWidth + gap),
+            y: startY,
+            width: cardWidth,
+            height: cardHeight,
+            headerY: 45,
+            padding: 17
+          }))
+        };
+      }
+
+      function makeOutline(parent, tag, attrs, type, delay, duration) {
+        const element = document.createElementNS(NS, tag);
+
+        for (const [name, value] of Object.entries(attrs)) {
+          element.setAttribute(name, value);
+        }
+
+        element.setAttribute("pathLength", "1");
+        element.setAttribute(
+          "class",
+          `intro-outline ${type || ""}`
+        );
+
+        element.style.setProperty("--draw-delay", `${delay}ms`);
+        element.style.setProperty("--draw-duration", `${duration}ms`);
+
+        parent.appendChild(element);
+        return element;
+      }
+
+      function makePiece(index) {
+        const piece = document.createElementNS(NS, "g");
+        piece.setAttribute("class", "intro-piece");
+
+        const direction = index % 2 === 0 ? -1 : 1;
+
+        piece.style.setProperty(
+          "--piece-x",
+          `${direction * CONFIG.pieceOffset}px`
+        );
+
+        piece.style.setProperty(
+          "--piece-y",
+          `${-direction * CONFIG.pieceOffset * .6}px`
+        );
+
+        svg.appendChild(piece);
+        return piece;
+      }
+
+      function build(layout) {
+        if (built) return;
+        built = true;
+
+        observer?.disconnect();
+        clearTimeout(layoutTimer);
+
+        svg.setAttribute(
+          "viewBox",
+          `0 0 ${window.innerWidth} ${window.innerHeight}`
+        );
+
+        const elapsed = performance.now() - startedAt;
+
+        const remaining = Math.max(
+          300,
+          CONFIG.totalDuration - CONFIG.joinDuration - elapsed
+        );
+
+        // 大外框从左上角开始描绘。
+        layout.groups.forEach((rect, index) => {
+          const piece = makePiece(index);
+
+          makeOutline(
+            piece,
+            "rect",
+            {
+              x: rect.x,
+              y: rect.y,
+              width: rect.width,
+              height: rect.height,
+              rx: 2
+            },
+            "intro-group-outline",
+            0,
+            remaining
+          );
+        });
+
+        /*
+         * 小卡片按从左到右的顺序开始描绘。
+         * 同列卡片再按从上到下排序。
+         */
+        const cards = [...layout.cards].sort((a, b) => {
+          return a.x - b.x || a.y - b.y;
+        });
+
+        cards.forEach((rect, index) => {
+          const progress = cards.length > 1
+            ? index / (cards.length - 1)
+            : 0;
+
+          const delay = progress * remaining * .52;
+          const duration = remaining - delay;
+
+          const piece = makePiece(index + 1);
+
+          makeOutline(
+            piece,
+            "rect",
+            {
+              x: rect.x,
+              y: rect.y,
+              width: rect.width,
+              height: rect.height,
+              rx: 5
+            },
+            "",
+            delay,
+            duration
+          );
+
+          makeOutline(
+            piece,
+            "line",
+            {
+              x1: rect.x + rect.padding,
+              y1: rect.y + rect.headerY,
+              x2: rect.x + rect.width - rect.padding,
+              y2: rect.y + rect.headerY
+            },
+            "intro-header-line",
+            delay + duration * .35,
+            duration * .65
+          );
+        });
+      }
+
+      function queueActualLayout() {
+        if (built) return;
+
+        cancelAnimationFrame(frame);
+
+        frame = requestAnimationFrame(() => {
+          try {
+            const layout = readActualLayout();
+            if (layout) build(layout);
+          } catch (error) {
+            cleanup();
+          }
+        });
       }
 
       try {
-        preparePixels();
-        resize();
-        draw(0);
+        observer = new MutationObserver(queueActualLayout);
 
-        window.addEventListener("resize", handleResize);
+        observer.observe(app, {
+          childList: true,
+          subtree: true
+        });
 
-        if (CONFIG.duration > 0) {
-          leaveTimer = setTimeout(() => {
-            overlay.classList.add("is-leaving");
-            removeTimer = setTimeout(cleanup, 700);
-          }, CONFIG.duration);
-        }
+        queueActualLayout();
+
+        layoutTimer = setTimeout(() => {
+          try {
+            build(readActualLayout() || fallbackLayout());
+          } catch (error) {
+            cleanup();
+          }
+        }, CONFIG.layoutWait);
+
+        const totalDuration = reducedMotion
+          ? 700
+          : CONFIG.totalDuration;
+
+        joinTimer = setTimeout(() => {
+          root.classList.add("probe-intro-joining");
+          overlay.classList.add("is-joining");
+        }, totalDuration - CONFIG.joinDuration);
+
+        endTimer = setTimeout(cleanup, totalDuration);
+
+        // 动画期间改变窗口大小时，直接结束，避免轮廓错位。
+        window.addEventListener("resize", cleanup, { once: true });
       } catch (error) {
         cleanup();
-        console.warn("[世界地图开场] 已跳过：", error);
+        console.warn("[线框开场] 已跳过：", error);
       }
     })();
   </script>
