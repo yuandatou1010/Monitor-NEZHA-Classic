@@ -9,8 +9,8 @@
   <link rel="stylesheet" href="/assets/app.css">
 
   <style>
-    /* 开场覆盖层，不影响原探针布局 */
-    #chicken-intro {
+    /* 独立开场层，不影响原探针布局 */
+    #world-intro {
       position: fixed;
       inset: 0;
       z-index: 9999;
@@ -19,168 +19,503 @@
       justify-content: center;
       overflow: hidden;
       background: #fff;
-      transition: background-color 180ms ease;
+      opacity: 1;
+      transition: opacity 650ms ease;
     }
 
-    /* 大号像素鸡，手机端自动缩小 */
-    #pixel-chicken {
-      position: relative;
-      width: min(380px, 82vw);
-      aspect-ratio: 20 / 18;
-    }
-
-    #pixel-chicken .chicken-pixel {
-      position: absolute;
-      width: 5.05%;
-      height: 5.62%;
-      background: var(--pixel-color);
-    }
-
-    /* 炸开时同步露出后面的探针 */
-    #chicken-intro.burst {
-      background-color: transparent;
+    #world-intro.is-leaving {
+      opacity: 0;
       pointer-events: none;
     }
 
-    #chicken-intro.burst .chicken-pixel {
-      animation: chicken-burst 550ms cubic-bezier(.15,.65,.3,1) both;
+    .world-intro-content {
+      width: min(1120px, 96vw);
+      padding: 20px 0;
     }
 
-    @keyframes chicken-burst {
-      from {
-        opacity: 1;
-        transform: translate(0, 0) rotate(0) scale(1);
+    #world-map {
+      display: block;
+      width: 100%;
+      aspect-ratio: 2 / 1;
+    }
+
+    .world-intro-caption {
+      margin-top: 12px;
+      text-align: center;
+      color: #8b9daa;
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+      font-size: 12px;
+      letter-spacing: 2px;
+    }
+
+    .world-intro-caption::before {
+      content: "";
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin-right: 9px;
+      border-radius: 2px;
+      background: #38c789;
+      box-shadow: 0 0 8px rgba(56, 199, 137, .25);
+    }
+
+    @media (max-width: 620px) {
+      .world-intro-content {
+        width: 98vw;
       }
 
-      to {
-        opacity: 0;
-        transform:
-          translate(var(--dx), var(--dy))
-          rotate(var(--rotation))
-          scale(.25);
+      .world-intro-caption {
+        margin-top: 20px;
+        font-size: 11px;
+        letter-spacing: 1px;
       }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      #chicken-intro.burst .chicken-pixel {
-        animation: chicken-fade 180ms ease both;
-      }
-
-      @keyframes chicken-fade {
-        to { opacity: 0; }
+      #world-intro {
+        transition: none;
       }
     }
   </style>
 </head>
 
 <body>
-  <div id="chicken-intro" aria-hidden="true">
-    <div id="pixel-chicken"></div>
+  <!-- 开场地图：与 #app 分开，避免模板渲染时被覆盖 -->
+  <div id="world-intro" aria-hidden="true">
+    <div class="world-intro-content">
+      <canvas id="world-map"></canvas>
+      <div class="world-intro-caption">
+        全球节点 · 静态效果预览
+      </div>
+    </div>
   </div>
 
   <main id="app"></main>
 
   <script>
     (() => {
-      const overlay = document.getElementById("chicken-intro");
-      const chicken = document.getElementById("pixel-chicken");
+      "use strict";
 
-      /*
-       * 点阵配色：
-       * . 透明
-       * K 黑色轮廓
-       * W 米白色羽毛
-       * G 灰色翅膀
-       * R 红色鸡冠
-       * Y 黄色嘴和脚
-       */
-      const drawing = [
-        "....................",
-        "............RR.R....",
-        "...........RRRRR....",
-        "...........KKKKK....",
-        "..........KWWWWWK...",
-        "..........KWWKWWK...",
-        "..........KWWWWWKYY.",
-        "..K.......KWWWWWKYY.",
-        "..KK.....KWWWWWWK...",
-        "..KWKKKKKWWWWWWRK...",
-        "...KWWWWWWWWWWWRK...",
-        "...KWWWWGGGWWWWK....",
-        "...KWWWGGGGWWWWK....",
-        "....KWWWGGWWWWK.....",
-        ".....KKWWWWWKK......",
-        ".......KKKKK........",
-        "........Y.Y.........",
-        ".......YY.YY........"
-      ];
+      /* ================= 配置区 ================= */
 
-      const colors = {
-        K: "#222222",
-        W: "#f5f1e8",
-        G: "#c9c6bd",
-        R: "#e7473c",
-        Y: "#efa62b"
+      const CONFIG = {
+        // 开场停留多久，单位毫秒。
+        // 改成 0 可以一直展示地图，方便调试。
+        duration: 5000,
+
+        // 地图每个小方块的间隔，越小越精细。
+        dotStep: 7,
+
+        // 方块之间保留的空隙。
+        dotGap: 2,
+
+        // 地图基础颜色。
+        landColor: "#c3e2f2",
+
+        // 固定点亮的位置，不调用数据接口。
+        locations: [
+          {
+            name: "香港",
+            lon: 114.17,
+            lat: 22.32,
+            labelX: -45,
+            labelY: 24,
+            phase: 0
+          },
+          {
+            name: "台湾",
+            lon: 121.0,
+            lat: 23.7,
+            labelX: 38,
+            labelY: 17,
+            phase: 1.2
+          },
+          {
+            name: "日本",
+            lon: 138.0,
+            lat: 37.0,
+            labelX: 28,
+            labelY: -18,
+            phase: 2.3
+          },
+          {
+            name: "新加坡",
+            lon: 103.82,
+            lat: 1.35,
+            labelX: 35,
+            labelY: 30,
+            phase: 3.4
+          },
+          {
+            name: "美国",
+            lon: -99.0,
+            lat: 38.0,
+            labelX: 0,
+            labelY: -29,
+            phase: 4.5
+          }
+        ]
       };
 
-      try {
-        const fragment = document.createDocumentFragment();
+      /* =============== 配置区结束 =============== */
 
-        drawing.forEach((row, y) => {
-          [...row].forEach((color, x) => {
-            if (!colors[color]) return;
+      const overlay = document.getElementById("world-intro");
+      const canvas = document.getElementById("world-map");
+      const ctx = canvas.getContext("2d");
 
-            const pixel = document.createElement("span");
-            pixel.className = "chicken-pixel";
+      if (!ctx) {
+        overlay.remove();
+        return;
+      }
 
-            pixel.style.left = `${x * 5}%`;
-            pixel.style.top = `${y / 18 * 100}%`;
+      const reducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
 
-            pixel.style.setProperty("--pixel-color", colors[color]);
+      /*
+       * 简化大陆轮廓，经度、纬度坐标。
+       * 仅用于开场视觉效果，不用于精确地理展示。
+       */
+      const landPolygons = [
+        // 北美洲
+        [
+          [-168,72],[-148,72],[-135,68],[-125,72],
+          [-110,73],[-95,75],[-78,70],[-61,58],
+          [-66,49],[-81,25],[-87,21],[-97,16],
+          [-105,23],[-112,30],[-120,36],[-126,49],
+          [-138,58],[-151,60],[-163,64]
+        ],
 
-            fragment.appendChild(pixel);
-          });
-        });
+        // 中美洲
+        [
+          [-98,22],[-87,22],[-86,16],[-79,9],
+          [-76,8],[-82,8],[-90,15]
+        ],
 
-        chicken.appendChild(fragment);
+        // 格陵兰
+        [
+          [-55,60],[-43,60],[-25,72],[-28,82],
+          [-48,84],[-63,77],[-60,68]
+        ],
 
-        // 停留时间：1300 = 1.3 秒
-        setTimeout(() => {
-          try {
-            const size = chicken.getBoundingClientRect();
+        // 南美洲
+        [
+          [-81,12],[-70,11],[-60,7],[-50,2],
+          [-35,-6],[-40,-22],[-49,-30],[-56,-40],
+          [-66,-55],[-73,-49],[-73,-32],[-79,-10]
+        ],
 
-            chicken.querySelectorAll(".chicken-pixel").forEach(pixel => {
-              const x = parseFloat(pixel.style.left) / 100 * size.width;
-              const y = parseFloat(pixel.style.top) / 100 * size.height;
+        // 欧洲与亚洲
+        [
+          [-10,36],[-10,44],[-2,49],[-5,58],
+          [8,58],[12,70],[28,71],[34,61],
+          [48,68],[70,73],[100,76],[130,72],
+          [153,65],[177,64],[170,55],[155,50],
+          [143,45],[137,35],[126,39],[122,31],
+          [121,23],[109,18],[108,10],[103,1],
+          [98,8],[96,20],[88,22],[80,8],
+          [74,15],[66,25],[56,25],[49,14],
+          [43,13],[35,30],[29,36],[23,39],
+          [16,38],[10,44],[2,42]
+        ],
 
-              // 从鸡的中心向四周扩散，并增加少许随机偏移。
-              const dx =
-                (x - size.width / 2) * (2 + Math.random() * 2)
-                + (Math.random() - .5) * 100;
+        // 非洲
+        [
+          [-17,35],[-5,36],[10,37],[25,32],
+          [34,30],[43,12],[51,11],[43,-3],
+          [39,-16],[31,-29],[20,-35],[12,-24],
+          [8,-5],[-3,5],[-15,10],[-17,22]
+        ],
 
-              const dy =
-                (y - size.height / 2) * (2 + Math.random() * 2)
-                + (Math.random() - .5) * 100;
+        // 阿拉伯半岛
+        [
+          [35,30],[48,30],[57,22],
+          [50,15],[43,13],[38,21]
+        ],
 
-              pixel.style.setProperty("--dx", `${dx}px`);
-              pixel.style.setProperty("--dy", `${dy}px`);
-              pixel.style.setProperty(
-                "--rotation",
-                `${(Math.random() - .5) * 360}deg`
-              );
+        // 英国、爱尔兰
+        [
+          [-10,50],[-3,50],[0,58],
+          [-5,59],[-8,55]
+        ],
+
+        // 冰岛
+        [
+          [-24,63],[-13,63],[-14,67],[-23,67]
+        ],
+
+        // 日本
+        [
+          [130,31],[134,33],[138,36],
+          [141,41],[145,44],[143,45],
+          [139,40],[135,35],[131,34]
+        ],
+
+        // 台湾
+        [
+          [120,22],[122,24],[122,26],[120,25]
+        ],
+
+        // 菲律宾
+        [
+          [120,19],[123,18],[126,8],
+          [123,6],[120,12]
+        ],
+
+        // 苏门答腊
+        [
+          [95,5],[100,1],[106,-6],
+          [103,-7],[98,-2]
+        ],
+
+        // 爪哇
+        [
+          [105,-6],[115,-7],[114,-9],[106,-8]
+        ],
+
+        // 婆罗洲
+        [
+          [109,7],[118,6],[119,-2],
+          [114,-4],[109,0]
+        ],
+
+        // 新几内亚
+        [
+          [131,-2],[141,-3],[151,-7],
+          [148,-10],[136,-7]
+        ],
+
+        // 澳大利亚
+        [
+          [113,-22],[122,-15],[130,-12],
+          [137,-13],[142,-10],[146,-20],
+          [153,-27],[149,-38],[138,-36],
+          [130,-32],[116,-35]
+        ],
+
+        // 新西兰
+        [
+          [172,-34],[178,-38],[173,-42],
+          [168,-47],[166,-45],[171,-40]
+        ],
+
+        // 马达加斯加
+        [
+          [48,-13],[51,-17],[47,-26],[44,-24]
+        ]
+      ];
+
+      // 固定逻辑尺寸，实际显示自适应屏幕。
+      const WIDTH = 1000;
+      const HEIGHT = 500;
+
+      let pixels = [];
+      let frameId = 0;
+      let stopped = false;
+      let leaveTimer = 0;
+      let removeTimer = 0;
+
+      function project(lon, lat) {
+        return {
+          x: 30 + (lon + 180) / 360 * 940,
+          y: 35 + (85 - lat) / 145 * 410
+        };
+      }
+
+      function pointInPolygon(x, y, polygon) {
+        let inside = false;
+
+        for (
+          let i = 0, j = polygon.length - 1;
+          i < polygon.length;
+          j = i++
+        ) {
+          const a = polygon[i];
+          const b = polygon[j];
+
+          const crosses =
+            (a.y > y) !== (b.y > y) &&
+            x < (b.x - a.x) * (y - a.y) /
+              (b.y - a.y) + a.x;
+
+          if (crosses) inside = !inside;
+        }
+
+        return inside;
+      }
+
+      const projectedLand = landPolygons.map(polygon => {
+        return polygon.map(([lon, lat]) => project(lon, lat));
+      });
+
+      const locations = CONFIG.locations.map(location => ({
+        ...location,
+        ...project(location.lon, location.lat)
+      }));
+
+      function preparePixels() {
+        pixels = [];
+
+        const step = CONFIG.dotStep;
+
+        for (let y = 25; y < HEIGHT - 35; y += step) {
+          for (let x = 20; x < WIDTH - 20; x += step) {
+            const onLand = projectedLand.some(polygon => {
+              return pointInPolygon(x, y, polygon);
             });
 
-            overlay.classList.add("burst");
-          } catch (error) {
-            overlay.remove();
+            if (onLand) pixels.push({ x, y });
           }
-        }, 1300);
+        }
+      }
 
-        // 退场结束后移除，不留下透明遮罩。
-        setTimeout(() => overlay.remove(), 1900);
-      } catch (error) {
-        // 动画异常时不阻挡探针。
+      function resize() {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        canvas.width = Math.max(1, Math.round(rect.width * dpr));
+        canvas.height = Math.max(1, Math.round(rect.height * dpr));
+
+        ctx.setTransform(
+          canvas.width / WIDTH,
+          0,
+          0,
+          canvas.height / HEIGHT,
+          0,
+          0
+        );
+      }
+
+      function drawLocation(location, time) {
+        const pulse = reducedMotion
+          ? 0.5
+          : (Math.sin(time * 0.0028 + location.phase) + 1) / 2;
+
+        const step = CONFIG.dotStep;
+        const size = step - CONFIG.dotGap;
+
+        // 轻微缩放起伏，不让标记实际乱跑。
+        const scale = 0.94 + pulse * 0.12;
+
+        ctx.save();
+        ctx.translate(location.x, location.y);
+        ctx.scale(scale, scale);
+
+        /*
+         * 中心实心绿，外圈渐变浅绿。
+         * 独立绘制，确保香港、新加坡等小地区也能看见。
+         */
+        for (let row = -2; row <= 2; row++) {
+          for (let col = -2; col <= 2; col++) {
+            const distance = Math.hypot(col, row);
+
+            if (distance > 2.25) continue;
+
+            const strength = Math.max(0, 1 - distance / 2.7);
+            const alpha = Math.min(
+              1,
+              strength * (0.55 + pulse * 0.35)
+            );
+
+            ctx.fillStyle = `rgba(35, 193, 126, ${alpha})`;
+
+            ctx.fillRect(
+              col * step - size / 2,
+              row * step - size / 2,
+              size,
+              size
+            );
+          }
+        }
+
+        ctx.fillStyle = "#16b978";
+        ctx.shadowColor = "rgba(35, 193, 126, .45)";
+        ctx.shadowBlur = 5 + pulse * 7;
+
+        ctx.fillRect(-size / 2, -size / 2, size, size);
+        ctx.restore();
+
+        // 地区名称和细引导线。
+        const labelX = location.x + location.labelX;
+        const labelY = location.y + location.labelY;
+
+        ctx.beginPath();
+        ctx.moveTo(location.x, location.y);
+        ctx.lineTo(labelX, labelY);
+        ctx.strokeStyle = "rgba(48, 160, 119, .38)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.font = '13px Arial, "Microsoft YaHei", sans-serif';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        // 白色描边，防止文字与地图重叠时看不清。
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "rgba(255,255,255,.95)";
+        ctx.strokeText(location.name, labelX, labelY);
+
+        ctx.fillStyle = "#29866a";
+        ctx.fillText(location.name, labelX, labelY);
+      }
+
+      function draw(time) {
+        if (stopped) return;
+
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+        ctx.fillStyle = CONFIG.landColor;
+
+        const size = CONFIG.dotStep - CONFIG.dotGap;
+
+        for (const pixel of pixels) {
+          ctx.fillRect(
+            pixel.x - size / 2,
+            pixel.y - size / 2,
+            size,
+            size
+          );
+        }
+
+        for (const location of locations) {
+          drawLocation(location, time);
+        }
+
+        if (!reducedMotion) {
+          frameId = requestAnimationFrame(draw);
+        }
+      }
+
+      function cleanup() {
+        stopped = true;
+        cancelAnimationFrame(frameId);
+        clearTimeout(leaveTimer);
+        clearTimeout(removeTimer);
+        window.removeEventListener("resize", handleResize);
         overlay.remove();
+      }
+
+      function handleResize() {
+        resize();
+
+        if (reducedMotion) draw(0);
+      }
+
+      try {
+        preparePixels();
+        resize();
+        draw(0);
+
+        window.addEventListener("resize", handleResize);
+
+        if (CONFIG.duration > 0) {
+          leaveTimer = setTimeout(() => {
+            overlay.classList.add("is-leaving");
+            removeTimer = setTimeout(cleanup, 700);
+          }, CONFIG.duration);
+        }
+      } catch (error) {
+        cleanup();
+        console.warn("[世界地图开场] 已跳过：", error);
       }
     })();
   </script>
